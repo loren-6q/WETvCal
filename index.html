@@ -46,8 +46,6 @@
 
         /**
          * RESILIENT ICON COMPONENT
-         * Uses the Lucide 'createIcons' engine which is version-safe and bypasses React
-         * forwardRef conflicts. This prevents the "non-iterable destructure" crash.
          */
         const Icon = ({ name, size = 16, className = "", strokeWidth = 2.5 }) => {
             const iconRef = useRef(null);
@@ -77,24 +75,33 @@
 
         // --- Firebase Configuration ---
         const getFirebaseConfig = () => {
-            try {
-                if (typeof __firebase_config !== 'undefined') return JSON.parse(__firebase_config);
-            } catch (e) {}
-            return {}; 
+            // Priority 1: Canvas preview environment config
+            if (typeof __firebase_config !== 'undefined') {
+                return JSON.parse(__firebase_config);
+            }
+            
+            // Priority 2: Your provided credentials for GitHub deployment
+            return {
+                apiKey: "AIzaSyDN_AIEAJB5G1bcR5kXSMmjlWd9aXLLYak",
+                authDomain: "wetvcal.firebaseapp.com",
+                projectId: "wetvcal",
+                storageBucket: "wetvcal.firebasestorage.app",
+                messagingSenderId: "380675879193",
+                appId: "1:380675879193:web:8f3cc25411137208441588"
+            };
         };
 
         const firebaseConfig = getFirebaseConfig();
         const app = FB.initializeApp(firebaseConfig);
         const auth = FB.getAuth(app);
         const db = FB.getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'vcal-production-v1';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'vcal-live-v1';
 
         // --- Constants ---
         const COLUMN_WIDTH = 20; 
         const ROW_HEIGHT = 33; 
         const SIDEBAR_WIDTH = 100;
 
-        // Colors set: No-Show = Orange, Problem = Red
         const STATUS_CONFIG = {
             future: { color: 'bg-blue-500', icon: 'Calendar', label: 'FUTURE' },
             checkedIn: { color: 'bg-green-500', icon: 'UserCheck', label: 'IN' },
@@ -186,7 +193,7 @@
 
             // Data Syncing
             useEffect(() => {
-                if (!user) return;
+                if (!user || !db) return;
 
                 const bCol = FB.collection(db, 'artifacts', appId, 'public', 'data', 'bookings');
                 const unsubB = FB.onSnapshot(bCol, (snap) => {
@@ -264,7 +271,7 @@
             };
 
             const handleSaveBooking = async (data) => {
-                if (!user) return;
+                if (!user || !db) return;
                 let bId = data.id;
                 if (bId.startsWith('new-')) {
                    const newDoc = FB.doc(FB.collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
@@ -278,12 +285,12 @@
             };
 
             const updateRoomConfig = async (docId, updates) => {
-                if (!user) return;
+                if (!user || !db) return;
                 await FB.setDoc(FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', docId), updates, { merge: true });
             };
 
             const onGridDrop = async (targetRoomId, targetBed) => {
-                if (!draggedBooking || !user) return;
+                if (!draggedBooking || !user || !db) return;
                 const occupant = bookings.find(b => 
                     b.id !== draggedBooking.id && b.roomId === targetRoomId && b.bed === targetBed &&
                     isOverlapping(draggedBooking.checkIn, draggedBooking.checkOut, b.checkIn, b.checkOut)
@@ -400,7 +407,6 @@
 
                                             if (end < viewStart || start > viewEnd) return null;
 
-                                            // Precision clipping logic for long bookings
                                             const displayStart = start < viewStart ? viewStart : start;
                                             const displayEnd = end > viewEnd ? viewEnd : end;
 
@@ -572,6 +578,5 @@
     </script>
 
     <script src="https://loren-6q.github.io/WETNav/nav.js"></script>
-
 </body>
 </html>
