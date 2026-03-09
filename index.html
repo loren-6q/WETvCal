@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VCAL</title>
     <!-- Favicon: High-Contrast Calendar Logo (White/Red with V) -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3QgeD0iMiIgeT0iNCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjZWY0NDQ0IiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMiA4aDI4VjRhNCA0IDAgMCAwLTQtNEg2YTQgNCAwIDAgMC00IDR6IiBmaWxsPSIjZWY0NDQ0Ii8+PHJlY3QgeD0iOCIgeT0iMiIgd2lkdGg9IjQiIGhlaWdodD0iNCIgcng9IjEiIGZpbGw9IiMzMzQxNTUiLz48cmVjdCB4PSIyMCIgeT0iMiIgd2lkdGg9IjQiIGhlaWdodD0iNCIgcng9IjEiIGZpbGw9IiMzMzQxNTUiLz48dGV4dCB4PSI1MCUiIHk9IjIyIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiMxZTI5M2IiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlY8L3RleHQ+PC9zdmc+">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3QgeD0iMiIgeT0iNCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjZWY0NDQ0IiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMiA4aDI4VjRhNCA0IDAgMCAwLTQtNEg2YTQgNCAwIDAgMC00IDR6IiBmaWxsPSIjZWY0NDQ0Ii8+PHJlY3QgeD0iOCIgeT0iMiIgd2lkdGg9IjQiIGhlaWdodD0iNCIgcng9IjEiIGZpbGw9IiMzMzQxNTUiLz48cmVjdCB4PSIyMCIgeT0iMiIgd2lkdGg9IjQiIGhlaWdodD0iNCIgcng9IjEiIGZpbGw9IiMzMzQxNTUiLz48dGV4dCB4PSI1MCUiIHk9IjIyIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiMxZDQwN2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlY8L3RleHQ+PC9zdmc+">
     
     <!-- Foundation Libraries -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -81,7 +81,7 @@
             appId: "1:380675879193:web:8f3cc25411137208441588"
         };
 
-        // Consistent Project ID for data persistence
+        // Consistent project identifier for Firestore paths
         const appId = 'wetvcal-v1'; 
 
         // --- Constants ---
@@ -111,6 +111,15 @@
             { name: '210', beds: 8, collapsed: false, order: 1 },
             { name: '211', beds: 16, collapsed: false, order: 2 },
         ];
+
+        // Helper to get local date string YYYY-MM-DD without UTC shifts
+        const formatDateLocal = (date) => {
+            const d = new Date(date);
+            const month = '' + (d.getMonth() + 1);
+            const day = '' + d.getDate();
+            const year = d.getFullYear();
+            return [year, month.padStart(2, '0'), day.padStart(2, '0')].join('-');
+        };
 
         const getDaysArray = (start, count) => {
             const arr = [];
@@ -169,9 +178,14 @@
                 if (!auth) return;
                 const initAuth = async () => {
                     try {
-                        // CRITICAL: When using hardcoded project credentials, Gemini tokens will mismatch.
-                        // We must always fallback to Anonymous sign-in for external deployments.
-                        await window.FB.signInAnonymously(auth);
+                        const internalToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                        if (internalToken && internalToken.length > 50) {
+                            try {
+                                await window.FB.signInWithCustomToken(auth, internalToken);
+                            } catch (ce) { await window.FB.signInAnonymously(auth); }
+                        } else {
+                            await window.FB.signInAnonymously(auth);
+                        }
                     } catch (e) {
                         console.error("Authentication Error:", e.code);
                         if (e.code === 'auth/configuration-not-found') setError("ENABLE_AUTH_PROVIDER");
@@ -253,28 +267,45 @@
 
             const handleAddBooking = (roomId, bed, date) => {
                 if (!user) return;
-                const checkIn = new Date(date).toISOString().split('T')[0];
+                const checkIn = formatDateLocal(date);
                 const checkOutDate = new Date(date); checkOutDate.setDate(checkOutDate.getDate() + 7);
-                setSelectedBooking({ id: 'new-' + Date.now(), firstName: '', lastName: '', country: 'Thailand', volunteerType: 'standard', roomId, bed, checkIn, checkOut: checkOutDate.toISOString().split('T')[0], status: 'future', deposits: { agoda: { val: 0, ref: false }, booking: { val: 0, ref: false }, hostelworld: { val: 0, ref: false }, cash: { val: 0, ref: false } } });
+                const checkOut = formatDateLocal(checkOutDate);
+
+                setSelectedBooking({ id: 'new-' + Date.now(), firstName: '', lastName: '', country: 'Thailand', volunteerType: 'standard', roomId, bed, checkIn, checkOut, status: 'future', deposits: { agoda: { val: 0, ref: false }, booking: { val: 0, ref: false }, hostelworld: { val: 0, ref: false }, cash: { val: 0, ref: false } } });
                 setBookingDeleteId(null); setModalPos({ x: window.innerWidth / 2 - 230, y: 100 }); setIsModalOpen(true);
             };
 
             const handleSaveBooking = async (data) => {
                 if (!user || !db) return;
-                let bId = data.id;
-                if (bId.startsWith('new-')) {
-                   const newDocRef = window.FB.doc(window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
-                   bId = newDocRef.id;
+                try {
+                    let bId = data.id;
+                    if (bId.startsWith('new-')) {
+                       const newDocRef = window.FB.doc(window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
+                       bId = newDocRef.id;
+                    }
+                    const docRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', bId);
+                    const { id, ...toSave } = data;
+                    await window.FB.setDoc(docRef, toSave);
+                    setIsModalOpen(false); // Fix: Ensure modal closes on success
+                    setSelectedBooking(null);
+                    setBookingDeleteId(null);
+                } catch (e) {
+                    console.error("Firestore Save Error:", e);
+                    setError("FIRESTORE_PERMISSION_DENIED");
                 }
-                const docRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', bId);
-                const toSave = { ...data }; delete toSave.id;
-                await window.FB.setDoc(docRef, toSave);
-                setIsModalOpen(false);
             };
 
             const updateRoomConfig = async (docId, updates) => {
                 if (!user || !db) return;
                 await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', docId), updates, { merge: true });
+            };
+
+            const onGridDrop = async (targetRoomId, targetBed) => {
+                if (!draggedBooking || !user || !db) return;
+                const occupant = bookings.find(b => b.id !== draggedBooking.id && b.roomId === targetRoomId && b.bed === targetBed && isOverlapping(draggedBooking.checkIn, draggedBooking.checkOut, b.checkIn, b.checkOut));
+                await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', draggedBooking.id), { roomId: targetRoomId, bed: targetBed }, { merge: true });
+                if (occupant) await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', occupant.id), { roomId: draggedBooking.roomId, bed: draggedBooking.bed }, { merge: true });
+                setDraggedBooking(null);
             };
 
             const depositTotals = useMemo(() => {
@@ -297,7 +328,7 @@
                 return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', stop); };
             }, [isDraggingModal]);
 
-            // Error Screen
+            // Troubleshooting Screens
             if (error === "ENABLE_AUTH_PROVIDER") {
                 return (
                     <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-100 p-8 font-sans text-center">
@@ -312,6 +343,20 @@
                                <li>4. Enable "Anonymous" and Save</li>
                            </ol>
                            <button onClick={() => window.location.reload()} className="w-full bg-slate-800 text-white font-black py-3 rounded-lg uppercase">Retry Connection</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (error === "FIRESTORE_PERMISSION_DENIED") {
+                return (
+                    <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-100 p-8 font-sans text-center">
+                        <div className="max-w-md bg-white p-8 rounded-2xl shadow-2xl border-t-8 border-red-600">
+                           <Icon name="ShieldAlert" size={48} className="text-red-600 mb-4 mx-auto" />
+                           <h2 className="text-2xl font-black mb-4 uppercase leading-none">Permission Denied</h2>
+                           <p className="text-slate-600 mb-6 text-sm">Database is refusing writes. Update your Firestore Rules.</p>
+                           <p className="text-left text-[10px] font-bold bg-slate-50 p-4 rounded mb-6 text-slate-500 uppercase">Set rules to:<br/><code className="block mt-2 text-red-600 lowercase font-mono">allow read, write: if request.auth != null;</code></p>
+                           <button onClick={() => window.location.reload()} className="w-full bg-slate-800 text-white font-black py-3 rounded-lg uppercase">Reload App</button>
                         </div>
                     </div>
                 );
@@ -353,7 +398,7 @@
                                 return (
                                     <div key={`${row.roomId}-${row.bed}`} className="flex border-b-2 border-slate-400 group relative transition-colors hover:bg-blue-50/40" style={{ height: ROW_HEIGHT }}>
                                         <div className="sticky left-0 z-10 bg-gray-50 border-r-2 border-slate-500 text-xs font-bold flex items-center px-2 text-slate-500 group-hover:bg-blue-100 shadow-[2px_0_5px_rgba(0,0,0,0.05)]" style={{ width: SIDEBAR_WIDTH }}>{row.roomName}-{row.bed}</div>
-                                        {days.map((slotDate, i) => <div key={i} onMouseEnter={() => setHoveredCol(i)} onClick={() => handleAddBooking(row.roomId, row.bed, slotDate)} className={`border-r-2 border-slate-300 relative cursor-crosshair h-full transition-colors ${hoveredCol === i ? 'bg-blue-100/30' : ''}`} style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }} />)}
+                                        {days.map((currentDate, i) => <div key={i} onMouseEnter={() => setHoveredCol(i)} onClick={() => handleAddBooking(row.roomId, row.bed, currentDate)} className={`border-r-2 border-slate-300 relative cursor-crosshair h-full transition-colors ${hoveredCol === i ? 'bg-blue-100/30' : ''}`} style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }} />)}
                                         {bookings.filter(b => b.roomId === row.roomId && b.bed === row.bed).map(booking => {
                                             const start = new Date(booking.checkIn); start.setHours(0,0,0,0);
                                             const end = new Date(booking.checkOut); end.setHours(0,0,0,0);
@@ -412,7 +457,7 @@
                                     {['agoda', 'booking', 'hostelworld', 'cash'].map(key => (
                                         <div key={key} className="grid grid-cols-[80px_1fr_100px] items-center gap-3">
                                             <span className="text-[10px] font-black text-slate-500 uppercase">{key === 'cash' ? 'Cash' : key}</span>
-                                            <div className="relative"><span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">฿</span><input type="number" className="w-full border-b-2 border-slate-300 bg-transparent text-right font-black text-sm outline-none" value={selectedBooking.deposits?.[key]?.val || ''} onChange={e => setSelectedBooking({...selectedBooking, deposits: { ...selectedBooking.deposits, [key]: { ...selectedBooking.deposits?.[key], val: e.target.value } }})} /></div>
+                                            <div className="relative"><span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">฿</span><input type="number" className="w-full border-b-2 border-slate-300 bg-transparent text-right font-black text-sm outline-none pl-4 focus:border-slate-800" value={selectedBooking.deposits?.[key]?.val || ''} onChange={e => setSelectedBooking({...selectedBooking, deposits: { ...selectedBooking.deposits, [key]: { ...selectedBooking.deposits?.[key], val: e.target.value } }})} /></div>
                                             <button type="button" onClick={() => setSelectedBooking({...selectedBooking, deposits: { ...selectedBooking.deposits, [key]: { ...selectedBooking.deposits?.[key], ref: !selectedBooking.deposits?.[key]?.ref } }})} disabled={!selectedBooking.deposits?.[key]?.val} className={`h-7 rounded text-[10px] font-black uppercase flex items-center justify-center gap-1 border-2 transition-all ${selectedBooking.deposits?.[key]?.ref ? 'bg-green-600 border-green-700 text-white shadow-inner' : 'bg-slate-200 border-slate-300 text-slate-600 hover:bg-slate-300'}`}>{selectedBooking.deposits?.[key]?.ref && <Icon name="Check" size={12} strokeWidth={4} />}{selectedBooking.deposits?.[key]?.ref ? 'Refunded' : 'Refund?'}</button>
                                         </div>
                                     ))}
@@ -434,7 +479,7 @@
                                         <div key={room.id} className="flex items-center gap-3 p-3 bg-slate-50 border-2 border-slate-200 rounded-md shadow-sm">
                                             <div className="flex-1"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Room Name</label><input className="w-full bg-transparent font-black text-sm uppercase outline-none focus:border-b-2 border-slate-800" value={room.name || ''} onChange={(e) => updateRoomConfig(room.id, { name: e.target.value })} /></div>
                                             <div className="w-16"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Beds</label><input type="number" className="w-full bg-transparent font-black text-sm outline-none focus:border-b-2 border-slate-800" value={room.beds || 0} onChange={(e) => updateRoomConfig(room.id, { beds: parseInt(e.target.value) || 1 })} /></div>
-                                            <div className="flex flex-col gap-1 shrink-0">{roomDeleteId === room.id ? <button onClick={async () => { await FB.deleteDoc(FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', room.id)); setRoomDeleteId(null); }} className="bg-red-600 text-white px-2 py-1 rounded text-[8px] font-black uppercase animate-pulse border border-red-800">KILL IT</button> : <button onClick={() => setRoomDeleteId(room.id)} className="text-red-400 p-2 hover:text-red-700 transition-colors"><Icon name="Trash2" size={20}/></button>}</div>
+                                            <div className="flex flex-col gap-1 shrink-0">{roomDeleteId === room.id ? <button onClick={async () => { try { await window.FB.deleteDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', room.id)); setRoomDeleteId(null); } catch (e) { alert("Permission Error."); } }} className="bg-red-600 text-white px-2 py-1 rounded text-[8px] font-black uppercase animate-pulse border border-red-800">KILL IT</button> : <button onClick={() => setRoomDeleteId(room.id)} className="text-red-400 p-2 hover:text-red-700 transition-colors"><Icon name="Trash2" size={20}/></button>}</div>
                                         </div>
                                     ))}
                                     <button onClick={async () => { try { await window.FB.addDoc(window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { name: 'NEW', beds: 4, collapsed: false, order: rooms.length + 1 }); } catch (e) { alert("Save failed."); } }} className="w-full py-4 border-4 border-dashed rounded-lg text-xs font-black text-gray-400 uppercase hover:border-blue-500 transition-all">+ Add Room</button>
