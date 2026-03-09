@@ -40,6 +40,7 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
+        // Expose Firebase to the Babel script
         window.FB = { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, query };
     </script>
 
@@ -86,7 +87,8 @@
             appId: "1:380675879193:web:8f3cc25411137208441588"
         };
 
-        const appId = 'vcal-live-final'; 
+        // Use a consistent App ID for stable data
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'vcal-v1'; 
 
         // --- Constants ---
         const COLUMN_WIDTH = 20; 
@@ -110,7 +112,11 @@
             other: { icon: 'HelpCircle', label: 'Other' },
         };
 
-        const COUNTRIES = ["Thailand", "UK", "USA", "Germany", "France", "Israel", "Russia", "Japan", "Australia", "Canada", "Spain", "Italy", "Netherlands", "Sweden", "Switzerland", "China", "South Korea", "Brazil", "Mexico", "Argentina", "India", "Vietnam", "Poland", "Ukraine", "Other"].sort();
+        const COUNTRIES = [
+            "Thailand", "UK", "USA", "Germany", "France", "Israel", "Russia", "Japan", "Australia", 
+            "Canada", "Spain", "Italy", "Netherlands", "Sweden", "Switzerland", "China", "South Korea",
+            "Brazil", "Mexico", "Argentina", "India", "Vietnam", "Poland", "Ukraine", "Other"
+        ].sort();
 
         const INITIAL_ROOM_DATA = [
             { name: '210', beds: 8, collapsed: false, order: 1 },
@@ -165,6 +171,7 @@
             const [isDraggingModal, setIsDraggingModal] = useState(false);
             const dragStartOffset = useRef({ x: 0, y: 0 });
 
+            // 1. Wait for Firebase modules
             useEffect(() => {
                 const checkFB = setInterval(() => {
                     if (window.FB && window.FB.initializeApp) {
@@ -175,6 +182,7 @@
                 return () => clearInterval(checkFB);
             }, []);
 
+            // 2. Initialize App and Auth
             const fbApp = useMemo(() => firebaseReady ? window.FB.initializeApp(firebaseConfig) : null, [firebaseReady]);
             const auth = useMemo(() => fbApp ? window.FB.getAuth(fbApp) : null, [fbApp]);
             const db = useMemo(() => fbApp ? window.FB.getFirestore(fbApp) : null, [fbApp]);
@@ -184,7 +192,7 @@
                 const initAuth = async () => {
                     try {
                         const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                        if (token) {
+                        if (token && token.length > 50) {
                             try {
                                 await window.FB.signInWithCustomToken(auth, token);
                             } catch (ce) { await window.FB.signInAnonymously(auth); }
@@ -192,7 +200,7 @@
                             await window.FB.signInAnonymously(auth);
                         }
                     } catch (e) { 
-                        console.error("Auth Error:", e.code); 
+                        console.error("Auth failed:", e.code); 
                         if (e.code === 'auth/configuration-not-found') setError("ENABLE_AUTH_PROVIDER");
                         else setError("AUTH_FAILED");
                         setLoading(false); 
@@ -208,20 +216,33 @@
                 });
             }, [auth]);
 
+            // 3. Data Syncing
             useEffect(() => {
                 if (!user || !db) return;
+
                 const bCol = window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'bookings');
                 const unsubB = window.FB.onSnapshot(bCol, (snap) => {
                     setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                     setLoading(false);
-                }, (err) => setLoading(false));
+                }, (err) => {
+                    console.error("Bookings snap error:", err);
+                    setError("FIRESTORE_PERMISSION_DENIED");
+                    setLoading(false);
+                });
 
                 const rCol = window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'rooms');
                 const unsubR = window.FB.onSnapshot(rCol, (snap) => {
                     const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    if (data.length === 0) INITIAL_ROOM_DATA.forEach(r => window.FB.addDoc(rCol, r));
-                    else setRooms(data.sort((a,b) => (a.order || 0) - (b.order || 0) || (a.name || '').localeCompare(b.name || '')));
+                    if (data.length === 0) {
+                        // Only add initial data if truly empty and we are connected
+                        INITIAL_ROOM_DATA.forEach(r => window.FB.addDoc(rCol, r));
+                    } else {
+                        setRooms(data.sort((a,b) => (a.order || 0) - (b.order || 0) || (a.name || '').localeCompare(b.name || '')));
+                    }
+                }, (err) => {
+                    console.error("Rooms load error:", err);
                 });
+
                 return () => { unsubB(); unsubR(); };
             }, [user, db]);
 
@@ -267,23 +288,39 @@
 
             const handleSaveBooking = async (data) => {
                 if (!user || !db) return;
-                let bId = data.id;
-                if (bId.startsWith('new-')) bId = window.FB.doc(window.FB.collection(db, 'any')).id;
-                const toSave = { ...data }; delete toSave.id;
-                await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', bId), toSave);
-                setIsModalOpen(false);
+                try {
+                    let bId = data.id;
+                    if (bId.startsWith('new-')) {
+                       // Correct ID generation following strict paths
+                       const newDoc = window.FB.doc(window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
+                       bId = newDoc.id;
+                    }
+                    const docRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', bId);
+                    const toSave = { ...data }; delete toSave.id;
+                    await window.FB.setDoc(docRef, toSave);
+                    setIsModalOpen(false);
+                } catch (e) {
+                    console.error("Save failed:", e);
+                    alert("Database Error: Could not save data. Check Firestore Rules.");
+                }
             };
 
             const updateRoomConfig = async (docId, updates) => {
                 if (!user || !db) return;
-                await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', docId), updates, { merge: true });
+                try {
+                    await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', docId), updates, { merge: true });
+                } catch (e) {
+                    console.error("Update room failed:", e);
+                }
             };
 
             const onGridDrop = async (targetRoomId, targetBed) => {
                 if (!draggedBooking || !user || !db) return;
-                const occupant = bookings.find(b => b.id !== draggedBooking.id && b.roomId === targetRoomId && b.bed === targetBed && isOverlapping(draggedBooking.checkIn, draggedBooking.checkOut, b.checkIn, b.checkOut));
-                await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', draggedBooking.id), { roomId: targetRoomId, bed: targetBed }, { merge: true });
-                if (occupant) await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', occupant.id), { roomId: draggedBooking.roomId, bed: draggedBooking.bed }, { merge: true });
+                try {
+                    const occupant = bookings.find(b => b.id !== draggedBooking.id && b.roomId === targetRoomId && b.bed === targetBed && isOverlapping(draggedBooking.checkIn, draggedBooking.checkOut, b.checkIn, b.checkOut));
+                    await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', draggedBooking.id), { roomId: targetRoomId, bed: targetBed }, { merge: true });
+                    if (occupant) await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', occupant.id), { roomId: draggedBooking.roomId, bed: draggedBooking.bed }, { merge: true });
+                } catch (e) { console.error("Drop failed:", e); }
                 setDraggedBooking(null);
             };
 
@@ -307,13 +344,14 @@
                 return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', stop); };
             }, [isDraggingModal]);
 
+            // Troubleshooting UI
             if (error === "ENABLE_AUTH_PROVIDER") {
                 return (
                     <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-100 p-8 font-sans text-center">
                         <div className="max-w-md bg-white p-8 rounded-2xl shadow-2xl border-t-8 border-orange-500">
                            <Icon name="AlertCircle" size={48} className="text-orange-500 mb-4 mx-auto" />
                            <h2 className="text-2xl font-black mb-4 uppercase leading-none">Enable Auth Provider</h2>
-                           <p className="text-slate-600 mb-6 text-sm">Anonymous Sign-in is disabled in your project settings.</p>
+                           <p className="text-slate-600 mb-6 text-sm font-bold uppercase">Anonymous Sign-in is disabled in your project settings.</p>
                            <ol className="text-left text-xs font-bold space-y-3 bg-slate-50 p-4 rounded mb-6 uppercase tracking-wider text-slate-500">
                                <li>1. Open Firebase Console</li>
                                <li>2. Go to "Authentication" section</li>
@@ -321,6 +359,20 @@
                                <li>4. Enable "Anonymous" and Save</li>
                            </ol>
                            <button onClick={() => window.location.reload()} className="w-full bg-slate-800 text-white font-black py-3 rounded-lg uppercase">Retry Connection</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (error === "FIRESTORE_PERMISSION_DENIED") {
+                return (
+                    <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-100 p-8 font-sans text-center">
+                        <div className="max-w-md bg-white p-8 rounded-2xl shadow-2xl border-t-8 border-red-600">
+                           <Icon name="ShieldAlert" size={48} className="text-red-600 mb-4 mx-auto" />
+                           <h2 className="text-2xl font-black mb-4 uppercase leading-none">Permission Denied</h2>
+                           <p className="text-slate-600 mb-6 text-sm font-bold uppercase">Firestore Rules are blocking the connection.</p>
+                           <p className="text-left text-[10px] font-bold bg-slate-50 p-4 rounded mb-6 text-slate-500 uppercase">Set your Firestore Rules to "Test Mode" or use:<br/><code className="block mt-2 text-red-600">allow read, write: if request.auth != null;</code></p>
+                           <button onClick={() => window.location.reload()} className="w-full bg-slate-800 text-white font-black py-3 rounded-lg uppercase">Reload App</button>
                         </div>
                     </div>
                 );
@@ -427,7 +479,7 @@
                                     ))}
                                 </div>
                                 <div className="flex justify-between pt-4 border-t-2 border-slate-300 gap-2">
-                                    <div className="relative">{bookingDeleteId === selectedBooking.id ? <button type="button" onClick={async () => { await window.FB.deleteDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', selectedBooking.id)); setIsModalOpen(false); }} className="bg-red-600 text-white px-4 py-2 rounded text-[10px] font-black uppercase shadow-lg animate-pulse border-2 border-red-800">CONFIRM DELETE?</button> : <button type="button" onClick={() => setBookingDeleteId(selectedBooking.id)} className="text-red-600 hover:bg-red-50 px-3 py-2 rounded text-[10px] font-black uppercase">Delete Stay</button>}</div>
+                                    <div className="relative">{bookingDeleteId === selectedBooking.id ? <button type="button" onClick={async () => { try { await window.FB.deleteDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', selectedBooking.id)); setIsModalOpen(false); } catch (e) { alert("Delete failed. Check Permissions."); } }} className="bg-red-600 text-white px-4 py-2 rounded text-[10px] font-black uppercase shadow-lg animate-pulse border-2 border-red-800">CONFIRM DELETE?</button> : <button type="button" onClick={() => setBookingDeleteId(selectedBooking.id)} className="text-red-600 hover:bg-red-50 px-3 py-2 rounded text-[10px] font-black uppercase">Delete Stay</button>}</div>
                                     <div className="flex gap-2"><button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2 bg-gray-200 rounded text-xs font-black uppercase transition-colors">Cancel</button><button type="submit" className="px-8 py-2 bg-slate-900 text-white rounded text-xs font-black uppercase shadow-lg shadow-slate-300 transition-all">Save Changes</button></div>
                                 </div>
                             </form>
@@ -443,10 +495,10 @@
                                         <div key={room.id} className="flex items-center gap-3 p-3 bg-slate-50 border-2 border-slate-200 rounded-md shadow-sm">
                                             <div className="flex-1"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Room Name</label><input className="w-full bg-transparent font-black text-sm uppercase outline-none focus:border-b-2 border-slate-800" value={room.name || ''} onChange={(e) => updateRoomConfig(room.id, { name: e.target.value })} /></div>
                                             <div className="w-16"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Beds</label><input type="number" className="w-full bg-transparent font-black text-sm outline-none focus:border-b-2 border-slate-800" value={room.beds || 0} onChange={(e) => updateRoomConfig(room.id, { beds: parseInt(e.target.value) || 1 })} /></div>
-                                            <div className="flex flex-col gap-1 shrink-0">{roomDeleteId === room.id ? <button onClick={async () => { await FB.deleteDoc(FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', room.id)); setRoomDeleteId(null); }} className="bg-red-600 text-white px-2 py-1 rounded text-[8px] font-black uppercase animate-pulse border border-red-800">KILL IT</button> : <button onClick={() => setRoomDeleteId(room.id)} className="text-red-400 p-2 hover:text-red-700 transition-colors"><Icon name="Trash2" size={20}/></button>}</div>
+                                            <div className="flex flex-col gap-1 shrink-0">{roomDeleteId === room.id ? <button onClick={async () => { try { await window.FB.deleteDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', room.id)); setRoomDeleteId(null); } catch (e) { alert("Permission Error."); } }} className="bg-red-600 text-white px-2 py-1 rounded text-[8px] font-black uppercase animate-pulse border border-red-800">KILL IT</button> : <button onClick={() => setRoomDeleteId(room.id)} className="text-red-400 p-2 hover:text-red-700 transition-colors"><Icon name="Trash2" size={20}/></button>}</div>
                                         </div>
                                     ))}
-                                    <button onClick={async () => { await FB.addDoc(FB.collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { name: 'NEW', beds: 4, collapsed: false, order: rooms.length + 1 }); }} className="w-full py-4 border-4 border-dashed rounded-lg text-xs font-black text-gray-400 uppercase hover:border-blue-500 transition-all">+ Add Room</button>
+                                    <button onClick={async () => { try { await window.FB.addDoc(window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { name: 'NEW', beds: 4, collapsed: false, order: rooms.length + 1 }); } catch (e) { alert("Save failed."); } }} className="w-full py-4 border-4 border-dashed rounded-lg text-xs font-black text-gray-400 uppercase hover:border-blue-500 transition-all">+ Add Room</button>
                                 </div>
                             </div>
                         </div>
