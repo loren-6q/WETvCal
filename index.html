@@ -13,7 +13,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- Lucide Core (Safe icon library) -->
+    <!-- Lucide Core -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
@@ -22,14 +22,7 @@
         .grid-cell { transition: background-color 0.1s ease; }
         .drag-handle { cursor: move; }
         html, body, #root { height: 100%; margin: 0; padding: 0; background-color: #f1f5f9; }
-        
-        .bar-text {
-            text-shadow: 1px 1px 0px rgba(0,0,0,0.2);
-        }
-
-        /* Highlighting Styles */
-        .highlight-col { background-color: rgba(59, 130, 246, 0.08); }
-        .highlight-cell { background-color: rgba(59, 130, 246, 0.15) !important; }
+        .bar-text { text-shadow: 1px 1px 0px rgba(0,0,0,0.2); }
     </style>
 </head>
 <body class="overflow-hidden">
@@ -37,23 +30,44 @@
 
     <!-- Firebase SDKs -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        window.FB = { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, query, getDocs };
-        window.dispatchEvent(new Event('firebase-sdk-loaded'));
+        window.FB = { initializeApp, getApps, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, query, getDocs };
+        window.dispatchEvent(new Event('firebase-ready'));
     </script>
 
     <script type="text/babel">
+        /**
+         * Global Helper Functions
+         * These are defined using function declarations to ensure hoisting and avoid ReferenceErrors.
+         */
+        
+        // Format YYYY-MM-DD from a Date object using local time
+        function formatDateLocal(date) {
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Get readable string like "10MAR" from "YYYY-MM-DD"
+        function getDDMMM(dateStr) {
+            if (!dateStr) return '';
+            // Parse as local midnight to avoid timezone shift
+            const parts = dateStr.split('-');
+            const d = new Date(parts[0], parts[1] - 1, parts[2]);
+            const day = d.getDate();
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            return `${day}${months[d.getMonth()]}`;
+        }
+
         const { useState, useMemo, useEffect, useRef } = React;
 
-        /**
-         * STABLE ICON COMPONENT
-         */
         const Icon = ({ name, size = 16, className = "", strokeWidth = 2.5 }) => {
             const iconRef = useRef(null);
-
             useEffect(() => {
                 if (iconRef.current && window.lucide && name) {
                     const iconData = window.lucide.icons[name];
@@ -66,12 +80,9 @@
                     });
                 }
             }, [name, size, className, strokeWidth]);
-
-            if (!name) return null;
             return <span ref={iconRef} className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }} />;
         };
 
-        // --- Firebase Configuration ---
         const firebaseConfig = {
             apiKey: "AIzaSyDN_AIEAJB5G1bcR5kXSMmjlWd9aXLLYak",
             authDomain: "wetvcal.firebaseapp.com",
@@ -81,10 +92,6 @@
             appId: "1:380675879193:web:8f3cc25411137208441588"
         };
 
-        // Consistent project identifier for Firestore paths
-        const appId = 'wetvcal-v1'; 
-
-        // --- Constants ---
         const COLUMN_WIDTH = 20; 
         const ROW_HEIGHT = 33; 
         const SIDEBAR_WIDTH = 100;
@@ -107,102 +114,62 @@
 
         const COUNTRIES = ["Thailand", "UK", "USA", "Germany", "France", "Israel", "Russia", "Japan", "Australia", "Canada", "Spain", "Italy", "Netherlands", "Sweden", "Switzerland", "China", "South Korea", "Brazil", "Mexico", "Argentina", "India", "Vietnam", "Poland", "Ukraine", "Other"].sort();
 
-        const INITIAL_ROOM_DATA = [
-            { name: '210', beds: 8, collapsed: false, order: 1 },
-            { name: '211', beds: 16, collapsed: false, order: 2 },
-        ];
-
-        // Helper to get local date string YYYY-MM-DD without UTC shifts
-        const formatDateLocal = (date) => {
-            const d = new Date(date);
-            const month = '' + (d.getMonth() + 1);
-            const day = '' + d.getDate();
-            const year = d.getFullYear();
-            return [year, month.padStart(2, '0'), day.padStart(2, '0')].join('-');
-        };
-
-        const getDaysArray = (start, count) => {
-            const arr = [];
-            const startDate = new Date(start);
-            startDate.setHours(0,0,0,0);
-            for (let i = 0; i < count; i++) {
-                const d = new Date(startDate);
-                d.setDate(startDate.getDate() + i);
-                arr.push(new Date(d));
-            }
-            return arr;
-        };
-
-        const isOverlapping = (s1, e1, s2, e2) => new Date(s1) < new Date(e2) && new Date(s2) < new Date(e1);
-
-        const getDDMMM = (dateStr) => {
-            if (!dateStr) return '';
-            const d = new Date(dateStr);
-            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-            return `${d.getDate()}${months[d.getMonth()]}`;
-        };
-
         function App() {
             const [user, setUser] = useState(null);
             const [viewStartDate, setViewStartDate] = useState(new Date(2026, 2, 1));
             const [rooms, setRooms] = useState([]);
             const [bookings, setBookings] = useState([]);
             const [loading, setLoading] = useState(true);
-            const [error, setError] = useState(null);
             const [firebaseReady, setFirebaseReady] = useState(!!window.FB);
+            const [error, setError] = useState(null);
 
             const [selectedBooking, setSelectedBooking] = useState(null);
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [isRoomManagerOpen, setIsRoomManagerOpen] = useState(false);
             const [daysToShow, setDaysToShow] = useState(60);
             const [hoveredCol, setHoveredCol] = useState(null);
-
             const [roomDeleteId, setRoomDeleteId] = useState(null);
             const [bookingDeleteId, setBookingDeleteId] = useState(null);
-
             const [modalPos, setModalPos] = useState({ x: 100, y: 100 });
             const [isDraggingModal, setIsDraggingModal] = useState(false);
             const dragStartOffset = useRef({ x: 0, y: 0 });
 
-            useEffect(() => {
-                const handleLoaded = () => setFirebaseReady(true);
-                window.addEventListener('firebase-sdk-loaded', handleLoaded);
-                return () => window.removeEventListener('firebase-sdk-loaded', handleLoaded);
+            // Environment specific App ID for proper data separation
+            const appId = useMemo(() => {
+                return typeof __app_id !== 'undefined' ? __app_id : 'wetvcal-live-v1';
             }, []);
 
-            const fbApp = useMemo(() => firebaseReady ? window.FB.initializeApp(firebaseConfig) : null, [firebaseReady]);
-            const auth = useMemo(() => fbApp ? window.FB.getAuth(fbApp) : null, [fbApp]);
-            const db = useMemo(() => fbApp ? window.FB.getFirestore(fbApp) : null, [fbApp]);
+            useEffect(() => {
+                const onReady = () => setFirebaseReady(true);
+                window.addEventListener('firebase-ready', onReady);
+                return () => window.removeEventListener('firebase-ready', onReady);
+            }, []);
+
+            const db = useMemo(() => {
+                if (!firebaseReady) return null;
+                const apps = window.FB.getApps();
+                const app = apps.length > 0 ? apps[0] : window.FB.initializeApp(firebaseConfig);
+                return window.FB.getFirestore(app);
+            }, [firebaseReady]);
 
             useEffect(() => {
-                if (!auth) return;
+                if (!firebaseReady) return;
+                const apps = window.FB.getApps();
+                const app = apps.length > 0 ? apps[0] : window.FB.initializeApp(firebaseConfig);
+                const auth = window.FB.getAuth(app);
+                
                 const initAuth = async () => {
                     try {
-                        const internalToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                        if (internalToken && internalToken.length > 50) {
-                            try {
-                                await window.FB.signInWithCustomToken(auth, internalToken);
-                            } catch (ce) { await window.FB.signInAnonymously(auth); }
-                        } else {
-                            await window.FB.signInAnonymously(auth);
-                        }
+                        await window.FB.signInAnonymously(auth);
                     } catch (e) {
-                        console.error("Authentication Error:", e.code);
-                        if (e.code === 'auth/configuration-not-found') setError("ENABLE_AUTH_PROVIDER");
-                        else setError("AUTH_FAILED");
+                        console.error("Auth Error:", e);
+                        if (e.code === 'auth/configuration-not-found') setError("ENABLE_AUTH");
                         setLoading(false);
                     }
                 };
                 initAuth();
-                const unsubscribe = window.FB.onAuthStateChanged(auth, (u) => {
-                    setUser(u);
-                    if (!u) {
-                        const timeout = setTimeout(() => { if (!u) setLoading(false); }, 4000);
-                        return () => clearTimeout(timeout);
-                    }
-                });
-                return () => unsubscribe();
-            }, [auth]);
+                return window.FB.onAuthStateChanged(auth, setUser);
+            }, [firebaseReady]);
 
             useEffect(() => {
                 if (!user || !db) return;
@@ -211,8 +178,7 @@
                     setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                     setLoading(false);
                 }, (err) => {
-                    console.error("Bookings load error:", err);
-                    setError("FIRESTORE_PERMISSION_DENIED");
+                    console.error("Booking listener error:", err);
                     setLoading(false);
                 });
 
@@ -220,39 +186,52 @@
                 const unsubR = window.FB.onSnapshot(rCol, (snap) => {
                     const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                     if (data.length === 0) {
-                        const checkAndSeed = async () => {
+                        const seed = async () => {
                             const current = await window.FB.getDocs(rCol);
-                            if (current.empty) INITIAL_ROOM_DATA.forEach(r => window.FB.addDoc(rCol, r));
+                            if (current.empty) {
+                                const INITIAL_ROOM_DATA = [
+                                    { name: '210', beds: 8, collapsed: false, order: 1 },
+                                    { name: '211', beds: 16, collapsed: false, order: 2 },
+                                ];
+                                INITIAL_ROOM_DATA.forEach(r => window.FB.addDoc(rCol, r));
+                            }
                         };
-                        checkAndSeed();
+                        seed();
                     } else {
                         setRooms(data.sort((a,b) => (a.order || 0) - (b.order || 0) || (a.name || '').localeCompare(b.name || '')));
                     }
-                }, (err) => console.error("Rooms load error:", err));
-
+                });
                 return () => { unsubB(); unsubR(); };
-            }, [user, db]);
+            }, [user, db, appId]);
 
             useEffect(() => {
-                const handleResize = () => setDaysToShow(Math.floor((window.innerWidth - SIDEBAR_WIDTH) / COLUMN_WIDTH));
-                handleResize();
-                window.addEventListener('resize', handleResize);
-                return () => window.removeEventListener('resize', handleResize);
+                const updateDays = () => setDaysToShow(Math.floor((window.innerWidth - SIDEBAR_WIDTH) / COLUMN_WIDTH));
+                updateDays();
+                window.addEventListener('resize', updateDays);
+                return () => window.removeEventListener('resize', updateDays);
             }, []);
 
-            const days = useMemo(() => getDaysArray(viewStartDate, daysToShow), [viewStartDate, daysToShow]);
+            const days = useMemo(() => {
+                const arr = [];
+                const start = new Date(viewStartDate);
+                start.setHours(0,0,0,0);
+                for (let i = 0; i < daysToShow; i++) {
+                    const d = new Date(start);
+                    d.setDate(start.getDate() + i);
+                    arr.push(d);
+                }
+                return arr;
+            }, [viewStartDate, daysToShow]);
 
             const flatBeds = useMemo(() => {
-                const result = [];
-                rooms.forEach(room => {
-                    result.push({ type: 'header', roomId: room.id, roomName: room.name, isCollapsed: room.collapsed });
-                    if (!room.collapsed) {
-                        for (let i = 1; i <= (room.beds || 0); i++) {
-                            result.push({ type: 'bed', roomId: room.id, roomName: room.name, bed: i });
-                        }
+                const res = [];
+                rooms.forEach(r => {
+                    res.push({ type: 'header', roomId: r.id, roomName: r.name, isCollapsed: r.collapsed });
+                    if (!r.collapsed) {
+                        for (let i = 1; i <= (r.beds || 0); i++) res.push({ type: 'bed', roomId: r.id, roomName: r.name, bed: i });
                     }
                 });
-                return result;
+                return res;
             }, [rooms]);
 
             const allBedOptions = useMemo(() => {
@@ -268,11 +247,14 @@
             const handleAddBooking = (roomId, bed, date) => {
                 if (!user) return;
                 const checkIn = formatDateLocal(date);
-                const checkOutDate = new Date(date); checkOutDate.setDate(checkOutDate.getDate() + 7);
+                const checkOutDate = new Date(date); 
+                checkOutDate.setDate(checkOutDate.getDate() + 7);
                 const checkOut = formatDateLocal(checkOutDate);
 
                 setSelectedBooking({ id: 'new-' + Date.now(), firstName: '', lastName: '', country: 'Thailand', volunteerType: 'standard', roomId, bed, checkIn, checkOut, status: 'future', deposits: { agoda: { val: 0, ref: false }, booking: { val: 0, ref: false }, hostelworld: { val: 0, ref: false }, cash: { val: 0, ref: false } } });
-                setBookingDeleteId(null); setModalPos({ x: window.innerWidth / 2 - 230, y: 100 }); setIsModalOpen(true);
+                setBookingDeleteId(null); 
+                setModalPos({ x: window.innerWidth / 2 - 230, y: 100 }); 
+                setIsModalOpen(true);
             };
 
             const handleSaveBooking = async (data) => {
@@ -280,18 +262,20 @@
                 try {
                     let bId = data.id;
                     if (bId.startsWith('new-')) {
-                       const newDocRef = window.FB.doc(window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
-                       bId = newDocRef.id;
+                        const coll = window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'bookings');
+                        bId = window.FB.doc(coll).id;
                     }
                     const docRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', bId);
                     const { id, ...toSave } = data;
-                    await window.FB.setDoc(docRef, toSave);
-                    setIsModalOpen(false); // Fix: Ensure modal closes on success
+                    
+                    // Close UI first for snappiness
+                    setIsModalOpen(false);
                     setSelectedBooking(null);
-                    setBookingDeleteId(null);
+                    
+                    await window.FB.setDoc(docRef, toSave);
                 } catch (e) {
-                    console.error("Firestore Save Error:", e);
-                    setError("FIRESTORE_PERMISSION_DENIED");
+                    console.error("Save failed:", e);
+                    alert("Database Error: Check connection and permissions.");
                 }
             };
 
@@ -299,22 +283,6 @@
                 if (!user || !db) return;
                 await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', docId), updates, { merge: true });
             };
-
-            const onGridDrop = async (targetRoomId, targetBed) => {
-                if (!draggedBooking || !user || !db) return;
-                const occupant = bookings.find(b => b.id !== draggedBooking.id && b.roomId === targetRoomId && b.bed === targetBed && isOverlapping(draggedBooking.checkIn, draggedBooking.checkOut, b.checkIn, b.checkOut));
-                await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', draggedBooking.id), { roomId: targetRoomId, bed: targetBed }, { merge: true });
-                if (occupant) await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', occupant.id), { roomId: draggedBooking.roomId, bed: draggedBooking.bed }, { merge: true });
-                setDraggedBooking(null);
-            };
-
-            const depositTotals = useMemo(() => {
-                if (!selectedBooking) return { paid: 0, ref: 0, bal: 0 };
-                const deps = selectedBooking.deposits || {};
-                const paid = Object.values(deps).reduce((sum, d) => sum + (Number(d?.val) || 0), 0);
-                const ref = Object.values(deps).reduce((sum, d) => sum + (d?.ref ? Number(d?.val) || 0 : 0), 0);
-                return { paid, ref, bal: paid - ref };
-            }, [selectedBooking]);
 
             const startModalDrag = (e) => {
                 setIsDraggingModal(true);
@@ -328,38 +296,23 @@
                 return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', stop); };
             }, [isDraggingModal]);
 
-            // Troubleshooting Screens
-            if (error === "ENABLE_AUTH_PROVIDER") {
-                return (
-                    <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-100 p-8 font-sans text-center">
-                        <div className="max-w-md bg-white p-8 rounded-2xl shadow-2xl border-t-8 border-orange-500">
-                           <Icon name="AlertCircle" size={48} className="text-orange-500 mb-4 mx-auto" />
-                           <h2 className="text-2xl font-black mb-4 uppercase leading-none">Enable Auth Provider</h2>
-                           <p className="text-slate-600 mb-6 text-sm">Anonymous Sign-in is disabled in your project settings.</p>
-                           <ol className="text-left text-xs font-bold space-y-3 bg-slate-50 p-4 rounded mb-6 uppercase tracking-wider text-slate-500">
-                               <li>1. Open Firebase Console</li>
-                               <li>2. Go to "Authentication" section</li>
-                               <li>3. Click "Sign-in method" tab</li>
-                               <li>4. Enable "Anonymous" and Save</li>
-                           </ol>
-                           <button onClick={() => window.location.reload()} className="w-full bg-slate-800 text-white font-black py-3 rounded-lg uppercase">Retry Connection</button>
-                        </div>
-                    </div>
-                );
-            }
+            const depositTotals = useMemo(() => {
+                if (!selectedBooking) return { paid: 0, ref: 0, bal: 0 };
+                const deps = selectedBooking.deposits || {};
+                const paid = Object.values(deps).reduce((sum, d) => sum + (Number(d?.val) || 0), 0);
+                const ref = Object.values(deps).reduce((sum, d) => sum + (d?.ref ? Number(d?.val) || 0 : 0), 0);
+                return { paid, ref, bal: paid - ref };
+            }, [selectedBooking]);
 
-            if (error === "FIRESTORE_PERMISSION_DENIED") {
-                return (
-                    <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-100 p-8 font-sans text-center">
-                        <div className="max-w-md bg-white p-8 rounded-2xl shadow-2xl border-t-8 border-red-600">
-                           <Icon name="ShieldAlert" size={48} className="text-red-600 mb-4 mx-auto" />
-                           <h2 className="text-2xl font-black mb-4 uppercase leading-none">Permission Denied</h2>
-                           <p className="text-slate-600 mb-6 text-sm">Database is refusing writes. Update your Firestore Rules.</p>
-                           <p className="text-left text-[10px] font-bold bg-slate-50 p-4 rounded mb-6 text-slate-500 uppercase">Set rules to:<br/><code className="block mt-2 text-red-600 lowercase font-mono">allow read, write: if request.auth != null;</code></p>
-                           <button onClick={() => window.location.reload()} className="w-full bg-slate-800 text-white font-black py-3 rounded-lg uppercase">Reload App</button>
-                        </div>
+            if (error === "ENABLE_AUTH") {
+                return <div className="h-screen flex items-center justify-center bg-slate-100 p-8 text-center font-sans">
+                    <div className="bg-white p-8 rounded shadow-xl border-t-8 border-orange-500 max-w-sm">
+                        <Icon name="AlertCircle" size={48} className="text-orange-500 mb-4 mx-auto" />
+                        <h2 className="text-xl font-black mb-2 uppercase">Auth Provider Required</h2>
+                        <p className="text-sm text-slate-600 mb-4 uppercase font-bold">Anonymous sign-in must be enabled in Firebase console.</p>
+                        <button onClick={() => window.location.reload()} className="bg-slate-800 text-white px-6 py-2 rounded uppercase font-bold text-xs">Retry</button>
                     </div>
-                );
+                </div>;
             }
 
             if (loading) return <div className="h-screen flex flex-col items-center justify-center bg-white font-sans"><Icon name="Loader2" className="animate-spin text-slate-800 mb-4" size={48} /><h2 className="text-xl font-black uppercase tracking-widest text-slate-600">Syncing VCAL...</h2></div>;
@@ -394,25 +347,25 @@
                             </div>
 
                             {flatBeds.map((row) => {
-                                if (row.type === 'header') return <div key={`h-${row.roomId}`} className="flex bg-slate-700 text-white font-black text-sm uppercase cursor-pointer h-7 items-center" onClick={() => updateRoomConfig(row.roomId, { collapsed: !row.isCollapsed })}><div className="sticky left-0 z-10 bg-inherit border-r-2 border-slate-500 px-2 flex items-center gap-2" style={{ width: SIDEBAR_WIDTH }}><Icon name="ChevronDown" size={14} className={row.isCollapsed ? "-rotate-90 transition-transform" : "transition-transform"} /> {row.roomName || 'UNNAMED'}</div></div>;
+                                if (row.type === 'header') return <div key={`h-${row.roomId}`} className="flex bg-slate-700 text-white font-black text-sm uppercase cursor-pointer h-7 items-center" onClick={() => updateRoomConfig(row.roomId, { collapsed: !row.isCollapsed })}><div className="sticky left-0 z-10 bg-inherit border-r-2 border-slate-500 px-2 flex items-center gap-2" style={{ width: SIDEBAR_WIDTH }}><Icon name="ChevronDown" size={14} className={row.isCollapsed ? "-rotate-90 transition-transform" : "transition-transform"} /> {row.roomName}</div></div>;
                                 return (
                                     <div key={`${row.roomId}-${row.bed}`} className="flex border-b-2 border-slate-400 group relative transition-colors hover:bg-blue-50/40" style={{ height: ROW_HEIGHT }}>
                                         <div className="sticky left-0 z-10 bg-gray-50 border-r-2 border-slate-500 text-xs font-bold flex items-center px-2 text-slate-500 group-hover:bg-blue-100 shadow-[2px_0_5px_rgba(0,0,0,0.05)]" style={{ width: SIDEBAR_WIDTH }}>{row.roomName}-{row.bed}</div>
-                                        {days.map((currentDate, i) => <div key={i} onMouseEnter={() => setHoveredCol(i)} onClick={() => handleAddBooking(row.roomId, row.bed, currentDate)} className={`border-r-2 border-slate-300 relative cursor-crosshair h-full transition-colors ${hoveredCol === i ? 'bg-blue-100/30' : ''}`} style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }} />)}
+                                        {days.map((slotDate, i) => <div key={i} onMouseEnter={() => setHoveredCol(i)} onClick={() => handleAddBooking(row.roomId, row.bed, slotDate)} className={`border-r-2 border-slate-300 relative cursor-crosshair h-full transition-colors ${hoveredCol === i ? 'bg-blue-100/30' : ''}`} style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }} />)}
                                         {bookings.filter(b => b.roomId === row.roomId && b.bed === row.bed).map(booking => {
-                                            const start = new Date(booking.checkIn); start.setHours(0,0,0,0);
-                                            const end = new Date(booking.checkOut); end.setHours(0,0,0,0);
+                                            const start = new Date(booking.checkIn + 'T00:00:00');
+                                            const end = new Date(booking.checkOut + 'T00:00:00');
                                             const vStart = new Date(viewStartDate); vStart.setHours(0,0,0,0);
                                             const vEnd = new Date(days[days.length-1]); vEnd.setHours(23,59,59,999);
                                             if (end < vStart || start > vEnd) return null;
                                             const dStart = start < vStart ? vStart : start;
                                             const dEnd = end > vEnd ? vEnd : end;
-                                            const left = ((dStart - vStart) / 86400000) * COLUMN_WIDTH;
-                                            const actualW = ((dEnd - dStart) / 86400000) * COLUMN_WIDTH;
+                                            const left = Math.round((dStart - vStart) / 86400000) * COLUMN_WIDTH;
+                                            const actualW = Math.round((dEnd - dStart) / 86400000) * COLUMN_WIDTH;
                                             const S = STATUS_CONFIG[booking.status] || STATUS_CONFIG.future;
                                             const T = GUEST_TYPES[booking.volunteerType || 'standard'] || GUEST_TYPES.standard;
-                                            const totalPaid = Object.values(booking.deposits || {}).reduce((s,d) => s + (Number(d?.val)||0), 0);
-                                            const curBal = Object.values(booking.deposits || {}).reduce((s,d) => s + (Number(d?.val)||0) - (d?.ref?Number(d?.val)||0:0), 0);
+                                            const paid = Object.values(booking.deposits || {}).reduce((s,d) => s + (Number(d?.val)||0), 0);
+                                            const bal = Object.values(booking.deposits || {}).reduce((s,d) => s + (Number(d?.val)||0) - (d?.ref?Number(d?.val)||0:0), 0);
                                             return (
                                                 <div key={booking.id} onClick={(e) => { e.stopPropagation(); setSelectedBooking(booking); setIsModalOpen(true); setModalPos({ x: e.clientX > 400 ? e.clientX - 400 : 20, y: 100 }); }} className={`absolute h-[32px] mt-0 border border-black/20 flex items-center px-1.5 text-white shadow-md cursor-pointer hover:brightness-110 z-10 transition-all ${S.color} ${start >= vStart ? 'rounded-l' : 'border-l-0'} ${end <= vEnd ? 'rounded-r' : 'border-r-0'}`} style={{ left: SIDEBAR_WIDTH + left, width: Math.max(actualW, 4) }}>
                                                     <div className="flex items-center gap-2 w-full overflow-hidden leading-none bar-text">
@@ -422,7 +375,7 @@
                                                             <span className="font-black text-[18px] uppercase tracking-tighter text-white/80">{getDDMMM(booking.checkIn)}-{getDDMMM(booking.checkOut)}</span>
                                                         </div>
                                                         <Icon name={S.icon} size={18} className="ml-auto mr-1 opacity-95" strokeWidth={3} />
-                                                        {totalPaid > 0 && <div className={`shrink-0 flex items-center justify-center rounded-full w-5 h-5 shadow-sm border border-black/10 ${curBal === 0 ? 'bg-green-600' : 'bg-yellow-400'}`}>{curBal === 0 ? <Icon name="Check" size={14} strokeWidth={4} /> : <span className="text-[12px] font-black text-black">฿</span>}</div>}
+                                                        {paid > 0 && <div className={`shrink-0 flex items-center justify-center rounded-full w-5 h-5 shadow-sm border border-black/10 ${bal === 0 ? 'bg-green-600' : 'bg-yellow-400'}`}>{bal === 0 ? <Icon name="Check" size={14} strokeWidth={4} /> : <span className="text-[12px] font-black text-black">฿</span>}</div>}
                                                     </div>
                                                 </div>
                                             );
@@ -435,7 +388,7 @@
 
                     {isModalOpen && selectedBooking && (
                         <div className="fixed z-50 bg-white border-2 border-slate-600 shadow-[0_20px_60px_rgba(0,0,0,0.4)] rounded-lg w-[460px] overflow-hidden" style={{ left: modalPos.x, top: modalPos.y }}>
-                            <div onMouseDown={startModalDrag} className={`${STATUS_CONFIG[selectedBooking.status]?.color || 'bg-slate-500'} p-2.5 text-white flex justify-between items-center drag-handle transition-colors`}>
+                            <div onMouseDown={startModalDrag} className={`${STATUS_CONFIG[selectedBooking.status]?.color || 'bg-slate-500'} p-2.5 text-white flex justify-between items-center cursor-move transition-colors`}>
                                 <div className="flex items-center gap-2 flex-1 mr-2"><span className="bg-black/40 px-2 py-0.5 rounded text-[11px] font-black uppercase">{rooms.find(r => r.id === selectedBooking.roomId)?.name || '?'}-{selectedBooking.bed || '?'}</span><input className="bg-transparent border-none outline-none font-black text-xl uppercase w-1/2 placeholder:text-white/40" value={selectedBooking.firstName || ''} placeholder="FIRST" onChange={e => setSelectedBooking({...selectedBooking, firstName: e.target.value})} onMouseDown={e => e.stopPropagation()} /><input className="bg-transparent border-none outline-none font-black text-xl uppercase w-1/2 placeholder:text-white/40" value={selectedBooking.lastName || ''} placeholder="LAST" onChange={e => setSelectedBooking({...selectedBooking, lastName: e.target.value})} onMouseDown={e => e.stopPropagation()} /></div>
                                 <button onClick={() => setIsModalOpen(false)}><Icon name="X" size={24}/></button>
                             </div>
@@ -457,13 +410,13 @@
                                     {['agoda', 'booking', 'hostelworld', 'cash'].map(key => (
                                         <div key={key} className="grid grid-cols-[80px_1fr_100px] items-center gap-3">
                                             <span className="text-[10px] font-black text-slate-500 uppercase">{key === 'cash' ? 'Cash' : key}</span>
-                                            <div className="relative"><span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">฿</span><input type="number" className="w-full border-b-2 border-slate-300 bg-transparent text-right font-black text-sm outline-none pl-4 focus:border-slate-800" value={selectedBooking.deposits?.[key]?.val || ''} onChange={e => setSelectedBooking({...selectedBooking, deposits: { ...selectedBooking.deposits, [key]: { ...selectedBooking.deposits?.[key], val: e.target.value } }})} /></div>
+                                            <div className="relative"><span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">฿</span><input type="number" className="w-full border-b-2 border-slate-300 bg-transparent text-right font-black text-sm outline-none" value={selectedBooking.deposits?.[key]?.val || ''} onChange={e => setSelectedBooking({...selectedBooking, deposits: { ...selectedBooking.deposits, [key]: { ...selectedBooking.deposits?.[key], val: e.target.value } }})} /></div>
                                             <button type="button" onClick={() => setSelectedBooking({...selectedBooking, deposits: { ...selectedBooking.deposits, [key]: { ...selectedBooking.deposits?.[key], ref: !selectedBooking.deposits?.[key]?.ref } }})} disabled={!selectedBooking.deposits?.[key]?.val} className={`h-7 rounded text-[10px] font-black uppercase flex items-center justify-center gap-1 border-2 transition-all ${selectedBooking.deposits?.[key]?.ref ? 'bg-green-600 border-green-700 text-white shadow-inner' : 'bg-slate-200 border-slate-300 text-slate-600 hover:bg-slate-300'}`}>{selectedBooking.deposits?.[key]?.ref && <Icon name="Check" size={12} strokeWidth={4} />}{selectedBooking.deposits?.[key]?.ref ? 'Refunded' : 'Refund?'}</button>
                                         </div>
                                     ))}
                                 </div>
                                 <div className="flex justify-between pt-4 border-t-2 border-slate-300 gap-2">
-                                    <div className="relative">{bookingDeleteId === selectedBooking.id ? <button type="button" onClick={async () => { try { await window.FB.deleteDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', selectedBooking.id)); setIsModalOpen(false); } catch (e) { alert("Delete failed. Check Permissions."); } }} className="bg-red-600 text-white px-4 py-2 rounded text-[10px] font-black uppercase shadow-lg animate-pulse border-2 border-red-800">CONFIRM DELETE?</button> : <button type="button" onClick={() => setBookingDeleteId(selectedBooking.id)} className="text-red-600 hover:bg-red-50 px-3 py-2 rounded text-[10px] font-black uppercase">Delete Stay</button>}</div>
+                                    <div className="relative">{bookingDeleteId === selectedBooking.id ? <button type="button" onClick={async () => { try { if (!user || !db) return; await window.FB.deleteDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', selectedBooking.id)); setIsModalOpen(false); } catch (e) { alert("Delete failed. Check Rules."); } }} className="bg-red-600 text-white px-4 py-2 rounded text-[10px] font-black uppercase shadow-lg animate-pulse border-2 border-red-800">CONFIRM DELETE?</button> : <button type="button" onClick={() => setBookingDeleteId(selectedBooking.id)} className="text-red-600 hover:bg-red-50 px-3 py-2 rounded text-[10px] font-black uppercase">Delete Stay</button>}</div>
                                     <div className="flex gap-2"><button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2 bg-gray-200 rounded text-xs font-black uppercase transition-colors">Cancel</button><button type="submit" className="px-8 py-2 bg-slate-900 text-white rounded text-xs font-black uppercase shadow-lg shadow-slate-300 transition-all">Save Changes</button></div>
                                 </div>
                             </form>
@@ -477,12 +430,12 @@
                                 <div className="p-4 space-y-3 max-h-[60vh] overflow-auto">
                                     {rooms.map((room) => (
                                         <div key={room.id} className="flex items-center gap-3 p-3 bg-slate-50 border-2 border-slate-200 rounded-md shadow-sm">
-                                            <div className="flex-1"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Room Name</label><input className="w-full bg-transparent font-black text-sm uppercase outline-none focus:border-b-2 border-slate-800" value={room.name || ''} onChange={(e) => updateRoomConfig(room.id, { name: e.target.value })} /></div>
-                                            <div className="w-16"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Beds</label><input type="number" className="w-full bg-transparent font-black text-sm outline-none focus:border-b-2 border-slate-800" value={room.beds || 0} onChange={(e) => updateRoomConfig(room.id, { beds: parseInt(e.target.value) || 1 })} /></div>
-                                            <div className="flex flex-col gap-1 shrink-0">{roomDeleteId === room.id ? <button onClick={async () => { try { await window.FB.deleteDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', room.id)); setRoomDeleteId(null); } catch (e) { alert("Permission Error."); } }} className="bg-red-600 text-white px-2 py-1 rounded text-[8px] font-black uppercase animate-pulse border border-red-800">KILL IT</button> : <button onClick={() => setRoomDeleteId(room.id)} className="text-red-400 p-2 hover:text-red-700 transition-colors"><Icon name="Trash2" size={20}/></button>}</div>
+                                            <div className="flex-1"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Room Name</label><input className="w-full bg-transparent font-black text-sm uppercase outline-none focus:border-b-2 border-slate-800" value={room.name || ''} onChange={(e) => { if (!user || !db) return; window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', room.id), { name: e.target.value }, { merge: true }); }} /></div>
+                                            <div className="w-16"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Beds</label><input type="number" className="w-full bg-transparent font-black text-sm outline-none focus:border-b-2 border-slate-800" value={room.beds || 0} onChange={(e) => { if (!user || !db) return; window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', room.id), { beds: parseInt(e.target.value) || 1 }, { merge: true }); }} /></div>
+                                            <div className="flex flex-col gap-1 shrink-0">{roomDeleteId === room.id ? <button onClick={async () => { if (!user || !db) return; await window.FB.deleteDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', room.id)); setRoomDeleteId(null); }} className="bg-red-600 text-white px-2 py-1 rounded text-[8px] font-black uppercase animate-pulse border border-red-800">KILL IT</button> : <button onClick={() => setRoomDeleteId(room.id)} className="text-red-400 p-2 hover:text-red-700 transition-colors"><Icon name="Trash2" size={20}/></button>}</div>
                                         </div>
                                     ))}
-                                    <button onClick={async () => { try { await window.FB.addDoc(window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { name: 'NEW', beds: 4, collapsed: false, order: rooms.length + 1 }); } catch (e) { alert("Save failed."); } }} className="w-full py-4 border-4 border-dashed rounded-lg text-xs font-black text-gray-400 uppercase hover:border-blue-500 transition-all">+ Add Room</button>
+                                    <button onClick={async () => { if (!user || !db) return; await window.FB.addDoc(window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { name: 'NEW', beds: 4, collapsed: false, order: rooms.length + 1 }); }} className="w-full py-4 border-4 border-dashed rounded-lg text-xs font-black text-gray-400 uppercase hover:border-blue-500 transition-all">+ Add Room</button>
                                 </div>
                             </div>
                         </div>
