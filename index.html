@@ -87,7 +87,7 @@
         const app = FB.initializeApp(firebaseConfig);
         const auth = FB.getAuth(app);
         const db = FB.getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'vcal-v5';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'vcal-production-v1';
 
         // --- Constants ---
         const COLUMN_WIDTH = 20; 
@@ -354,9 +354,9 @@
                                 {days.map((day, i) => {
                                     const is1st = day.getDate() === 1;
                                     return (
-                                        <div key={i} onMouseEnter={() => setHoveredCol(i)} className={`flex flex-col items-center justify-center border-r-2 border-slate-400 text-[10px] font-bold h-10 relative transition-colors ${hoveredCol === i ? 'bg-blue-100/50' : ''} ${day.getDate() === 1 ? 'border-l-4 border-l-blue-600 bg-blue-50' : ''}`} style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}>
+                                        <div key={i} onMouseEnter={() => setHoveredCol(i)} className={`flex flex-col items-center justify-center border-r-2 border-slate-400 text-[10px] font-bold h-10 relative transition-colors ${hoveredCol === i ? 'bg-blue-100/50' : ''} ${is1st ? 'border-l-4 border-l-blue-600 bg-blue-50' : ''}`} style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}>
                                             <span className="text-gray-900 leading-none">{day.getDate()}</span>
-                                            {day.getDate() === 1 && <span className="absolute top-0 left-1 text-[9px] font-black text-blue-700 uppercase">{day.toLocaleDateString('en-US', { month: 'short' })}</span>}
+                                            {is1st && <span className="absolute top-0 left-1 text-[9px] font-black text-blue-700 uppercase">{day.toLocaleDateString('en-US', { month: 'short' })}</span>}
                                         </div>
                                     );
                                 })}
@@ -388,18 +388,37 @@
 
                                         {/* Bars */}
                                         {bookings.filter(b => b.roomId === row.roomId && b.bed === row.bed).map(booking => {
-                                            const start = new Date(booking.checkIn); const end = new Date(booking.checkOut);
-                                            const viewStart = new Date(viewStartDate); const viewEnd = days[days.length-1];
+                                            const start = new Date(booking.checkIn); 
+                                            start.setHours(0,0,0,0);
+                                            const end = new Date(booking.checkOut);
+                                            end.setHours(0,0,0,0);
+                                            
+                                            const viewStart = new Date(viewStartDate); 
+                                            viewStart.setHours(0,0,0,0);
+                                            const viewEnd = new Date(days[days.length-1]);
+                                            viewEnd.setHours(23,59,59,999);
+
                                             if (end < viewStart || start > viewEnd) return null;
-                                            const offset = (start - viewStart) / 86400000; const dur = (end - start) / 86400000;
-                                            const left = Math.max(0, offset * COLUMN_WIDTH); const actualW = Math.min(dur * COLUMN_WIDTH, (daysToShow - Math.max(0, offset)) * COLUMN_WIDTH);
+
+                                            // Precision clipping logic for long bookings
+                                            const displayStart = start < viewStart ? viewStart : start;
+                                            const displayEnd = end > viewEnd ? viewEnd : end;
+
+                                            const leftOffsetDays = (displayStart - viewStart) / 86400000;
+                                            const widthDays = (displayEnd - displayStart) / 86400000;
+
+                                            const left = leftOffsetDays * COLUMN_WIDTH;
+                                            const actualW = widthDays * COLUMN_WIDTH;
+
                                             const StatusCfg = STATUS_CONFIG[booking.status] || STATUS_CONFIG.future;
                                             const GuestTypeCfg = GUEST_TYPES[booking.volunteerType || 'standard'] || GUEST_TYPES.standard;
                                             const curBal = Object.values(booking.deposits || {}).reduce((s,d) => s + (Number(d?.val)||0) - (d?.ref?Number(d?.val)||0:0), 0);
                                             const totalPaid = Object.values(booking.deposits || {}).reduce((s,d) => s + (Number(d?.val)||0), 0);
 
                                             return (
-                                                <div key={booking.id} onClick={(e) => { e.stopPropagation(); setSelectedBooking(booking); setIsModalOpen(true); setModalPos({ x: e.clientX > 400 ? e.clientX - 400 : 20, y: 100 }); }} className={`absolute h-[32px] mt-0 border border-black/20 flex items-center px-1.5 text-white shadow-md cursor-pointer hover:brightness-110 z-10 transition-all ${StatusCfg.color} ${start >= viewStart ? 'rounded-l' : 'border-l-0'} ${end <= viewEnd ? 'rounded-r' : 'border-r-0'}`} style={{ left: SIDEBAR_WIDTH + left, width: actualW }}>
+                                                <div key={booking.id} onClick={(e) => { e.stopPropagation(); setSelectedBooking(booking); setIsModalOpen(true); setModalPos({ x: e.clientX > 400 ? e.clientX - 400 : 20, y: 100 }); }} 
+                                                    className={`absolute h-[32px] mt-0 border border-black/20 flex items-center px-1.5 text-white shadow-md cursor-pointer hover:brightness-110 z-10 transition-all ${StatusCfg.color} ${start >= viewStart ? 'rounded-l' : 'border-l-0'} ${end <= viewEnd ? 'rounded-r' : 'border-r-0'}`} 
+                                                    style={{ left: SIDEBAR_WIDTH + left, width: Math.max(actualW, 4) }}>
                                                     <div className="flex items-center gap-2 w-full overflow-hidden leading-none bar-text">
                                                         <Icon name={GuestTypeCfg.icon} size={18} strokeWidth={3} />
                                                         <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
