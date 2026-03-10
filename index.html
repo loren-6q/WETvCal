@@ -3,46 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VCAL</title>
-    <!-- Favicon: High-Contrast Calendar Logo (White/Red with V) -->
+    <title>VCAL | Guest Calendar</title>
+    <!-- Favicon: High-Contrast Calendar Logo -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3QgeD0iMiIgeT0iNCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjZWY0NDQ0IiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMiA4aDI4VjRhNCA0IDAgMCAwLTQtNEg2YTQgNCAwIDAgMC00IDR6IiBmaWxsPSIjZWY0NDQ0Ii8+PHJlY3QgeD0iOCIgeT0iMiIgd2lkdGg9IjQiIGhlaWdodD0iNCIgcng9IjEiIGZpbGw9IiMzMzQxNTUiLz48cmVjdCB4PSIyMCIgeT0iMiIgd2lkdGg9IjQiIGhlaWdodD0iNCIgcng9IjEiIGZpbGw9IiMzMzQxNTUiLz48dGV4dCB4PSI1MCUiIHk9IjIyIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiMxZDQwN2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlY8L3RleHQ+PC9zdmc+">
-    
-    <!-- Foundation Libraries -->
+
+    <!-- Pre-load Libraries -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Lucide Core -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .grid-cell { transition: background-color 0.1s ease; }
-        .drag-handle { cursor: move; }
-        html, body, #root { height: 100%; margin: 0; padding: 0; background-color: #f1f5f9; }
+        html, body, #root { height: 100%; margin: 0; padding: 0; background-color: #f1f5f9; font-family: sans-serif; }
+        
+        /* Initial Boot Loader */
+        #boot-loader {
+            position: fixed; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; background: white; z-index: 9999;
+        }
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid #f3f3f3;
+            border-top: 4px solid #1e293b; border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
         .bar-text { text-shadow: 1px 1px 0px rgba(0,0,0,0.2); }
+        .grid-line { border-right: 1px solid #e2e8f0; }
+        .row-line { border-bottom: 1px solid #cbd5e1; }
+        .highlight-col { background-color: rgba(59, 130, 246, 0.08); }
     </style>
 </head>
-<body class="overflow-hidden">
+<body>
+    <div id="boot-loader">
+        <div class="spinner"></div>
+        <div style="margin-top: 15px; font-weight: 900; letter-spacing: -0.05em; color: #1e293b; text-transform: uppercase;">Syncing VCAL...</div>
+    </div>
+
     <div id="root"></div>
 
-    <!-- Firebase SDKs -->
     <script type="module">
-        import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        window.FB = { initializeApp, getApps, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, query, getDocs };
-        window.dispatchEvent(new Event('firebase-ready'));
+        window.FB = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, query, getDocs };
+        window.dispatchEvent(new Event('firebase-initialized'));
     </script>
 
     <script type="text/babel">
-        /**
-         * Global Helper Functions
-         */
-        
+        const { useState, useMemo, useEffect, useRef } = React;
+
+        // Helpers
         function formatDateLocal(date) {
             const d = new Date(date);
             const year = d.getFullYear();
@@ -55,28 +69,23 @@
             if (!dateStr) return '';
             const parts = dateStr.split('-');
             const d = new Date(parts[0], parts[1] - 1, parts[2]);
-            const day = d.getDate();
             const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-            return `${day}${months[d.getMonth()]}`;
+            return `${d.getDate()}${months[d.getMonth()]}`;
         }
 
-        const { useState, useMemo, useEffect, useRef } = React;
-
-        const Icon = ({ name, size = 16, className = "", strokeWidth = 2.5 }) => {
-            const iconRef = useRef(null);
+        const Icon = ({ name, size = 16, className = "" }) => {
+            const ref = useRef(null);
             useEffect(() => {
-                if (iconRef.current && window.lucide && name) {
-                    const iconData = window.lucide.icons[name];
-                    if (!iconData) return;
-                    iconRef.current.innerHTML = `<i data-lucide="${name}"></i>`;
+                if (ref.current && window.lucide && name) {
+                    ref.current.innerHTML = `<i data-lucide="${name}"></i>`;
                     window.lucide.createIcons({
-                        icons: { [name]: iconData },
-                        attrs: { width: size, height: size, 'stroke-width': strokeWidth, class: className },
+                        icons: { [name]: window.lucide.icons[name] },
+                        attrs: { width: size, height: size, 'stroke-width': 3, class: className },
                         nameAttr: 'data-lucide'
                     });
                 }
-            }, [name, size, className, strokeWidth]);
-            return <span ref={iconRef} className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }} />;
+            }, [name, size, className]);
+            return <span ref={ref} className="inline-flex items-center justify-center shrink-0" />;
         };
 
         const firebaseConfig = {
@@ -88,9 +97,7 @@
             appId: "1:380675879193:web:8f3cc25411137208441588"
         };
 
-        const COLUMN_WIDTH = 20; 
-        const ROW_HEIGHT = 33; 
-        const SIDEBAR_WIDTH = 100;
+        const APP_ID = 'wetvcal-prod-v1';
 
         const STATUS_CONFIG = {
             future: { color: 'bg-blue-500', icon: 'Calendar', label: 'FUTURE' },
@@ -108,102 +115,67 @@
             other: { icon: 'HelpCircle', label: 'Other' },
         };
 
-        const COUNTRIES = ["Thailand", "UK", "USA", "Germany", "France", "Israel", "Russia", "Japan", "Australia", "Canada", "Spain", "Italy", "Netherlands", "Sweden", "Switzerland", "China", "South Korea", "Brazil", "Mexico", "Argentina", "India", "Vietnam", "Poland", "Ukraine", "Other"].sort();
+        const COUNTRIES = ["Thailand", "UK", "USA", "Germany", "France", "Israel", "Russia", "Japan", "Australia", "Canada", "Spain", "Italy", "Netherlands", "Sweden", "Switzerland", "China", "South Korea", "Brazil", "Mexico", "Other"].sort();
 
         function App() {
             const [user, setUser] = useState(null);
-            const [viewStartDate, setViewStartDate] = useState(new Date(2026, 2, 1));
             const [rooms, setRooms] = useState([]);
             const [bookings, setBookings] = useState([]);
+            const [viewStartDate, setViewStartDate] = useState(new Date(2026, 2, 1));
+            const [daysToShow, setDaysToShow] = useState(60);
             const [loading, setLoading] = useState(true);
-            const [firebaseReady, setFirebaseReady] = useState(!!window.FB);
-            const [error, setError] = useState(null);
-
+            const [hoveredCol, setHoveredCol] = useState(null);
+            
             const [selectedBooking, setSelectedBooking] = useState(null);
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [isRoomManagerOpen, setIsRoomManagerOpen] = useState(false);
-            const [daysToShow, setDaysToShow] = useState(60);
-            const [hoveredCol, setHoveredCol] = useState(null);
-            const [roomDeleteId, setRoomDeleteId] = useState(null);
             const [bookingDeleteId, setBookingDeleteId] = useState(null);
+            const [roomDeleteId, setRoomDeleteId] = useState(null);
             const [modalPos, setModalPos] = useState({ x: 100, y: 100 });
-            const [isDraggingModal, setIsDraggingModal] = useState(false);
-            const dragStartOffset = useRef({ x: 0, y: 0 });
 
-            const appId = useMemo(() => {
-                return typeof __app_id !== 'undefined' ? __app_id : 'wetvcal-live-v1';
-            }, []);
-
+            // Initialize DB and Auth
             useEffect(() => {
-                const onReady = () => setFirebaseReady(true);
-                window.addEventListener('firebase-ready', onReady);
-                return () => window.removeEventListener('firebase-ready', onReady);
-            }, []);
+                const init = async () => {
+                    const fb = window.FB;
+                    if (!fb) return;
+                    const app = fb.initializeApp(firebaseConfig);
+                    const db = fb.getFirestore(app);
+                    const auth = fb.getAuth(app);
 
-            const db = useMemo(() => {
-                if (!firebaseReady) return null;
-                const apps = window.FB.getApps();
-                const app = apps.length > 0 ? apps[0] : window.FB.initializeApp(firebaseConfig);
-                return window.FB.getFirestore(app);
-            }, [firebaseReady]);
+                    fb.onAuthStateChanged(auth, async (u) => {
+                        if (!u) {
+                            try { await fb.signInAnonymously(auth); } catch(e) { console.error(e); }
+                        } else {
+                            setUser(u);
+                            const bPath = fb.collection(db, 'artifacts', APP_ID, 'public', 'data', 'bookings');
+                            fb.onSnapshot(bPath, (s) => {
+                                setBookings(s.docs.map(d => ({ id: d.id, ...d.data() })));
+                                setLoading(false);
+                                document.getElementById('boot-loader')?.remove();
+                            });
 
-            useEffect(() => {
-                if (!firebaseReady) return;
-                const apps = window.FB.getApps();
-                const app = apps.length > 0 ? apps[0] : window.FB.initializeApp(firebaseConfig);
-                const auth = window.FB.getAuth(app);
-                
-                const initAuth = async () => {
-                    try {
-                        await window.FB.signInAnonymously(auth);
-                    } catch (e) {
-                        console.error("Auth Error:", e);
-                        if (e.code === 'auth/configuration-not-found') setError("ENABLE_AUTH");
-                        setLoading(false);
-                    }
+                            const rPath = fb.collection(db, 'artifacts', APP_ID, 'public', 'data', 'rooms');
+                            fb.onSnapshot(rPath, (s) => {
+                                const data = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                                if (data.length === 0) {
+                                    fb.addDoc(rPath, { name: '210', beds: 8, collapsed: false, order: 1 });
+                                    fb.addDoc(rPath, { name: '211', beds: 16, collapsed: false, order: 2 });
+                                } else {
+                                    setRooms(data.sort((a,b) => (a.order || 0) - (b.order || 0)));
+                                }
+                            });
+                        }
+                    });
                 };
-                initAuth();
-                return window.FB.onAuthStateChanged(auth, setUser);
-            }, [firebaseReady]);
+                if (window.FB) init();
+                else window.addEventListener('firebase-initialized', init);
+            }, []);
 
             useEffect(() => {
-                if (!user || !db) return;
-                const bCol = window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'bookings');
-                const unsubB = window.FB.onSnapshot(bCol, (snap) => {
-                    setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                    setLoading(false);
-                }, (err) => {
-                    console.error("Booking listener error:", err);
-                    setLoading(false);
-                });
-
-                const rCol = window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'rooms');
-                const unsubR = window.FB.onSnapshot(rCol, (snap) => {
-                    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    if (data.length === 0) {
-                        const seed = async () => {
-                            const current = await window.FB.getDocs(rCol);
-                            if (current.empty) {
-                                const INITIAL_ROOM_DATA = [
-                                    { name: '210', beds: 8, collapsed: false, order: 1 },
-                                    { name: '211', beds: 16, collapsed: false, order: 2 },
-                                ];
-                                INITIAL_ROOM_DATA.forEach(r => window.FB.addDoc(rCol, r));
-                            }
-                        };
-                        seed();
-                    } else {
-                        setRooms(data.sort((a,b) => (a.order || 0) - (b.order || 0) || (a.name || '').localeCompare(b.name || '')));
-                    }
-                });
-                return () => { unsubB(); unsubR(); };
-            }, [user, db, appId]);
-
-            useEffect(() => {
-                const updateDays = () => setDaysToShow(Math.floor((window.innerWidth - SIDEBAR_WIDTH) / COLUMN_WIDTH));
-                updateDays();
-                window.addEventListener('resize', updateDays);
-                return () => window.removeEventListener('resize', updateDays);
+                const update = () => setDaysToShow(Math.floor((window.innerWidth - 100) / 20));
+                update();
+                window.addEventListener('resize', update);
+                return () => window.removeEventListener('resize', update);
             }, []);
 
             const days = useMemo(() => {
@@ -221,174 +193,129 @@
             const flatBeds = useMemo(() => {
                 const res = [];
                 rooms.forEach(r => {
-                    res.push({ type: 'header', roomId: r.id, roomName: r.name, isCollapsed: r.collapsed });
+                    res.push({ type: 'header', roomId: r.id, name: r.name, collapsed: r.collapsed });
                     if (!r.collapsed) {
-                        for (let i = 1; i <= (r.beds || 0); i++) res.push({ type: 'bed', roomId: r.id, roomName: r.name, bed: i });
+                        for (let i = 1; i <= (r.beds || 0); i++) res.push({ type: 'bed', roomId: r.id, name: r.name, bed: i });
                     }
                 });
                 return res;
             }, [rooms]);
 
             const allBedOptions = useMemo(() => {
-                const options = [];
+                const opts = [];
                 rooms.forEach(r => {
-                    for (let i = 1; i <= (r.beds || 0); i++) {
-                        options.push({ label: `${r.name || 'Room'}-${i}`, value: `${r.id}|${i}` });
-                    }
+                    for (let i = 1; i <= (r.beds || 0); i++) opts.push({ label: `${r.name}-${i}`, val: `${r.id}|${i}` });
                 });
-                return options;
+                return opts;
             }, [rooms]);
 
-            const handleAddBooking = (roomId, bed, date) => {
+            const handleAdd = (roomId, bed, date) => {
                 if (!user) return;
                 const checkIn = formatDateLocal(date);
-                const checkOutDate = new Date(date); 
-                checkOutDate.setDate(checkOutDate.getDate() + 7);
-                const checkOut = formatDateLocal(checkOutDate);
-
+                const outDate = new Date(date); outDate.setDate(outDate.getDate() + 7);
+                const checkOut = formatDateLocal(outDate);
                 setSelectedBooking({ id: 'new-' + Date.now(), firstName: '', lastName: '', country: 'Thailand', volunteerType: 'standard', roomId, bed, checkIn, checkOut, status: 'future', deposits: { agoda: { val: 0, ref: false }, booking: { val: 0, ref: false }, hostelworld: { val: 0, ref: false }, cash: { val: 0, ref: false } } });
-                setBookingDeleteId(null); 
-                setModalPos({ x: window.innerWidth / 2 - 230, y: 100 }); 
+                setBookingDeleteId(null);
+                setModalPos({ x: window.innerWidth / 2 - 230, y: 100 });
                 setIsModalOpen(true);
             };
 
-            const handleSaveBooking = async (data) => {
-                if (!user || !db) return;
+            const handleSave = async (data) => {
+                if (!user || !window.FB) return;
+                const fb = window.FB;
+                const db = fb.getFirestore();
+                setIsModalOpen(false);
                 try {
                     let bId = data.id;
                     if (bId.startsWith('new-')) {
-                        const coll = window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'bookings');
-                        bId = window.FB.doc(coll).id;
+                        bId = fb.doc(fb.collection(db, 'any')).id;
                     }
-                    const docRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', bId);
-                    const { id, ...toSave } = data;
-                    
-                    setIsModalOpen(false);
-                    setSelectedBooking(null);
-                    setBookingDeleteId(null);
-                    
-                    await window.FB.setDoc(docRef, toSave);
-                } catch (e) {
-                    console.error("Save failed:", e);
-                    alert("Database Error: Check connection and permissions.");
-                }
+                    const docRef = fb.doc(db, 'artifacts', APP_ID, 'public', 'data', 'bookings', bId);
+                    const { id, ...payload } = data;
+                    await fb.setDoc(docRef, payload);
+                } catch (e) { alert("Save Error"); }
             };
 
-            const handleDeleteBooking = async (id) => {
-                if (!user || !db || !id) return;
-                try {
-                    // Explicitly close modal and clear states first
-                    setIsModalOpen(false);
-                    setSelectedBooking(null);
-                    setBookingDeleteId(null);
-
-                    if (!id.startsWith('new-')) {
-                        const docRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'bookings', id);
-                        await window.FB.deleteDoc(docRef);
-                    }
-                } catch (e) {
-                    console.error("Delete failed:", e);
-                    alert("Delete failed. Check project permissions.");
-                }
+            const handleDelete = async (id) => {
+                if (!user || !id || id.startsWith('new-')) { setIsModalOpen(false); return; }
+                setIsModalOpen(false);
+                const fb = window.FB;
+                const db = fb.getFirestore();
+                await fb.deleteDoc(fb.doc(db, 'artifacts', APP_ID, 'public', 'data', 'bookings', id));
             };
 
-            const updateRoomConfig = async (docId, updates) => {
-                if (!user || !db) return;
-                await window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', docId), updates, { merge: true });
+            const updateRoom = (id, upd) => {
+                if (!user) return;
+                window.FB.setDoc(window.FB.doc(window.FB.getFirestore(), 'artifacts', APP_ID, 'public', 'data', 'rooms', id), upd, { merge: true });
             };
-
-            const startModalDrag = (e) => {
-                setIsDraggingModal(true);
-                dragStartOffset.current = { x: e.clientX - modalPos.x, y: e.clientY - modalPos.y };
-            };
-
-            useEffect(() => {
-                const move = (e) => { if (isDraggingModal) setModalPos({ x: e.clientX - dragStartOffset.current.x, y: e.clientY - dragStartOffset.current.y }); };
-                const stop = () => setIsDraggingModal(false);
-                window.addEventListener('mousemove', move); window.addEventListener('mouseup', stop);
-                return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', stop); };
-            }, [isDraggingModal]);
 
             const depositTotals = useMemo(() => {
                 if (!selectedBooking) return { paid: 0, ref: 0, bal: 0 };
                 const deps = selectedBooking.deposits || {};
-                const paid = Object.values(deps).reduce((sum, d) => sum + (Number(d?.val) || 0), 0);
-                const ref = Object.values(deps).reduce((sum, d) => sum + (d?.ref ? Number(d?.val) || 0 : 0), 0);
+                const paid = Object.values(deps).reduce((sum, d) => sum + (Number(d.val) || 0), 0);
+                const ref = Object.values(deps).reduce((sum, d) => sum + (d.ref ? Number(d.val) || 0 : 0), 0);
                 return { paid, ref, bal: paid - ref };
             }, [selectedBooking]);
 
-            if (error === "ENABLE_AUTH") {
-                return <div className="h-screen flex items-center justify-center bg-slate-100 p-8 text-center font-sans">
-                    <div className="bg-white p-8 rounded shadow-xl border-t-8 border-orange-500 max-w-sm">
-                        <Icon name="AlertCircle" size={48} className="text-orange-500 mb-4 mx-auto" />
-                        <h2 className="text-xl font-black mb-2 uppercase">Auth Provider Required</h2>
-                        <p className="text-sm text-slate-600 mb-4 uppercase font-bold">Anonymous sign-in must be enabled in Firebase console.</p>
-                        <button onClick={() => window.location.reload()} className="bg-slate-800 text-white px-6 py-2 rounded uppercase font-bold text-xs">Retry</button>
-                    </div>
-                </div>;
-            }
-
-            if (loading) return <div className="h-screen flex flex-col items-center justify-center bg-white font-sans"><Icon name="Loader2" className="animate-spin text-slate-800 mb-4" size={48} /><h2 className="text-xl font-black uppercase tracking-widest text-slate-600">Syncing VCAL...</h2></div>;
+            if (loading && !user) return null;
 
             return (
-                <div className="flex flex-col h-screen overflow-hidden font-sans select-none">
-                    <header className="flex items-center justify-between px-4 py-2 bg-white border-b-2 border-slate-300 shadow-md z-40 shrink-0">
+                <div className="flex flex-col h-screen overflow-hidden select-none">
+                    <header className="flex items-center justify-between px-4 py-2 bg-white border-b-2 border-slate-300 shadow-sm z-40 shrink-0">
                         <div className="flex items-center gap-4">
                             <h1 className="text-xl font-black text-slate-800 tracking-tighter uppercase">VCAL</h1>
                             <div className="flex items-center bg-gray-100 rounded border-2 border-slate-300 p-1">
-                                <button onClick={() => setViewStartDate(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n; })} className="p-1 hover:bg-white transition-colors"><Icon name="ChevronLeft" size={20}/></button>
-                                <span className="px-4 font-black text-sm w-36 text-center uppercase text-slate-700">{viewStartDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
-                                <button onClick={() => setViewStartDate(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n; })} className="p-1 hover:bg-white transition-colors"><Icon name="ChevronRight" size={20}/></button>
+                                <button onClick={() => setViewStartDate(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n; })} className="p-1 hover:bg-white"><Icon name="ChevronLeft" size={20}/></button>
+                                <span className="px-4 font-black text-xs uppercase text-slate-700 w-32 text-center">{viewStartDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
+                                <button onClick={() => setViewStartDate(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n; })} className="p-1 hover:bg-white"><Icon name="ChevronRight" size={20}/></button>
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={() => setIsRoomManagerOpen(true)} className="px-4 py-2 bg-slate-800 text-white rounded font-black text-sm uppercase shadow-md transition-all hover:scale-105 active:scale-95 shadow-slate-300">Rooms</button>
-                            <button onClick={() => setViewStartDate(new Date(new Date(2026, 2, 10).setHours(0,0,0,0)))} className="px-4 py-2 bg-white border-2 border-slate-800 rounded font-black text-sm uppercase">Today</button>
+                            <button onClick={() => { setIsRoomManagerOpen(true); setRoomDeleteId(null); }} className="px-4 py-2 bg-slate-800 text-white rounded font-black text-xs uppercase shadow hover:scale-105 active:scale-95 transition-all">Rooms</button>
+                            <button onClick={() => setViewStartDate(new Date(new Date().setHours(0,0,0,0)))} className="px-4 py-2 bg-white border-2 border-slate-800 rounded font-black text-xs uppercase">Today</button>
                         </div>
                     </header>
 
-                    <div className="flex-1 overflow-auto relative bg-white" onMouseLeave={() => setHoveredCol(null)}>
+                    <main className="flex-1 overflow-auto relative bg-white" onMouseLeave={() => setHoveredCol(null)}>
                         <div className="inline-block min-w-fit pr-[2px]">
-                            <div className="sticky top-0 z-20 flex bg-white border-b-2 border-slate-500 shadow h-10 overflow-hidden">
-                                <div className="sticky left-0 z-30 bg-gray-100 border-r-2 border-slate-500 text-xs font-black flex items-center justify-center text-gray-600 uppercase" style={{ width: SIDEBAR_WIDTH }}>BED</div>
-                                {days.map((dayItem, i) => (
-                                    <div key={i} onMouseEnter={() => setHoveredCol(i)} className={`flex flex-col items-center justify-center border-r-2 border-slate-400 text-[10px] font-bold h-10 relative transition-colors ${hoveredCol === i ? 'bg-blue-100/50' : ''} ${dayItem.getDate() === 1 ? 'border-l-4 border-l-blue-600 bg-blue-50' : ''}`} style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}>
-                                        <span className="text-gray-900 leading-none">{dayItem.getDate()}</span>
-                                        {dayItem.getDate() === 1 && <span className="absolute top-0 left-1 text-[9px] font-black text-blue-700 uppercase">{dayItem.toLocaleDateString('en-US', { month: 'short' })}</span>}
+                            <div className="sticky top-0 z-20 flex bg-white border-b-2 border-slate-400 shadow-sm h-10">
+                                <div className="sticky left-0 z-30 bg-slate-50 border-r-2 border-slate-400 w-[100px] flex items-center justify-center text-[11px] font-black uppercase text-slate-500">BED</div>
+                                {days.map((d, i) => (
+                                    <div key={i} onMouseEnter={() => setHoveredCol(i)} className={`flex flex-col items-center justify-center border-r border-slate-200 w-[20px] text-[10px] font-bold ${hoveredCol === i ? 'bg-blue-100/50' : ''} ${d.getDate() === 1 ? 'border-l-4 border-l-blue-600 bg-blue-50' : ''}`}>
+                                        <span>{d.getDate()}</span>
                                     </div>
                                 ))}
                             </div>
 
                             {flatBeds.map((row) => {
-                                if (row.type === 'header') return <div key={`h-${row.roomId}`} className="flex bg-slate-700 text-white font-black text-sm uppercase cursor-pointer h-7 items-center" onClick={() => updateRoomConfig(row.roomId, { collapsed: !row.isCollapsed })}><div className="sticky left-0 z-10 bg-inherit border-r-2 border-slate-500 px-2 flex items-center gap-2" style={{ width: SIDEBAR_WIDTH }}><Icon name="ChevronDown" size={14} className={row.isCollapsed ? "-rotate-90 transition-transform" : "transition-transform"} /> {row.roomName}</div></div>;
+                                if (row.type === 'header') return <div key={row.roomId} className="flex bg-slate-700 text-white font-black text-[12px] uppercase h-7 items-center cursor-pointer" onClick={() => updateRoom(row.roomId, { collapsed: !row.collapsed })}><div className="sticky left-0 z-10 bg-inherit border-r-2 border-slate-500 px-2 flex items-center gap-2 w-[100px]"><Icon name="ChevronDown" className={row.collapsed ? '-rotate-90' : ''} size={14} /> {row.name}</div></div>;
+                                
                                 return (
-                                    <div key={`${row.roomId}-${row.bed}`} className="flex border-b-2 border-slate-400 group relative transition-colors hover:bg-blue-50/40" style={{ height: ROW_HEIGHT }}>
-                                        <div className="sticky left-0 z-10 bg-gray-50 border-r-2 border-slate-500 text-xs font-bold flex items-center px-2 text-slate-500 group-hover:bg-blue-100 shadow-[2px_0_5px_rgba(0,0,0,0.05)]" style={{ width: SIDEBAR_WIDTH }}>{row.roomName}-{row.bed}</div>
-                                        {days.map((slotDate, i) => <div key={i} onMouseEnter={() => setHoveredCol(i)} onClick={() => handleAddBooking(row.roomId, row.bed, slotDate)} className={`border-r-2 border-slate-300 relative cursor-crosshair h-full transition-colors ${hoveredCol === i ? 'bg-blue-100/30' : ''}`} style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }} />)}
-                                        {bookings.filter(b => b.roomId === row.roomId && b.bed === row.bed).map(booking => {
-                                            const start = new Date(booking.checkIn + 'T00:00:00');
-                                            const end = new Date(booking.checkOut + 'T00:00:00');
-                                            const vStart = new Date(viewStartDate); vStart.setHours(0,0,0,0);
-                                            const vEnd = new Date(days[days.length-1]); vEnd.setHours(23,59,59,999);
-                                            if (end < vStart || start > vEnd) return null;
-                                            const dStart = start < vStart ? vStart : start;
-                                            const dEnd = end > vEnd ? vEnd : end;
-                                            const left = Math.round((dStart - vStart) / 86400000) * COLUMN_WIDTH;
-                                            const actualW = Math.round((dEnd - dStart) / 86400000) * COLUMN_WIDTH;
-                                            const S = STATUS_CONFIG[booking.status] || STATUS_CONFIG.future;
-                                            const T = GUEST_TYPES[booking.volunteerType || 'standard'] || GUEST_TYPES.standard;
-                                            const paid = Object.values(booking.deposits || {}).reduce((s,d) => s + (Number(d?.val)||0), 0);
-                                            const bal = Object.values(booking.deposits || {}).reduce((s,d) => s + (Number(d?.val)||0) - (d?.ref?Number(d?.val)||0:0), 0);
+                                    <div key={`${row.roomId}-${row.bed}`} className="flex row-line h-[33px] group relative">
+                                        <div className="sticky left-0 z-10 bg-slate-50 border-r-2 border-slate-400 w-[100px] flex items-center px-2 text-[12px] font-black text-slate-600 group-hover:bg-blue-50">{row.name}-{row.bed}</div>
+                                        {days.map((d, di) => <div key={di} onMouseEnter={() => setHoveredCol(di)} onClick={() => handleAdd(row.roomId, row.bed, d)} className={`grid-line w-[20px] cursor-crosshair h-full ${hoveredCol === di ? 'bg-blue-50/50' : ''}`} />)}
+                                        
+                                        {bookings.filter(b => b.roomId === row.roomId && b.bed === row.bed).map(b => {
+                                            const start = b.checkIn; const end = b.checkOut;
+                                            const vStart = formatDateLocal(days[0]); const vEnd = formatDateLocal(days[days.length-1]);
+                                            if (end <= vStart || start > vEnd) return null;
+                                            const dStart = start < vStart ? vStart : start; const dEnd = end > vEnd ? vEnd : end;
+                                            const getDiff = (s, e) => (new Date(e) - new Date(s)) / 86400000;
+                                            const left = getDiff(vStart, dStart) * 20; const width = getDiff(dStart, dEnd) * 20;
+                                            const S = STATUS_CONFIG[b.status] || STATUS_CONFIG.future;
+                                            const T = GUEST_TYPES[b.volunteerType || 'standard'] || GUEST_TYPES.standard;
+                                            const paid = Object.values(b.deposits || {}).reduce((s,d) => s + (Number(d.val)||0), 0);
+                                            const bal = Object.values(b.deposits || {}).reduce((s,d) => s + (Number(d.val)||0) - (d.ref?Number(d.val)||0 : 0), 0);
                                             return (
-                                                <div key={booking.id} onClick={(e) => { e.stopPropagation(); setSelectedBooking(booking); setIsModalOpen(true); setModalPos({ x: e.clientX > 400 ? e.clientX - 400 : 20, y: 100 }); }} className={`absolute h-[32px] mt-0 border border-black/20 flex items-center px-1.5 text-white shadow-md cursor-pointer hover:brightness-110 z-10 transition-all ${S.color} ${start >= vStart ? 'rounded-l' : 'border-l-0'} ${end <= vEnd ? 'rounded-r' : 'border-r-0'}`} style={{ left: SIDEBAR_WIDTH + left, width: Math.max(actualW, 4) }}>
-                                                    <div className="flex items-center gap-2 w-full overflow-hidden leading-none bar-text">
-                                                        <Icon name={T.icon} size={18} strokeWidth={3} />
-                                                        <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
-                                                            <span className="font-black text-[18px] uppercase tracking-tighter drop-shadow-md">{booking.firstName || '???'}</span>
-                                                            <span className="font-black text-[18px] uppercase tracking-tighter text-white/80">{getDDMMM(booking.checkIn)}-{getDDMMM(booking.checkOut)}</span>
-                                                        </div>
-                                                        <Icon name={S.icon} size={18} className="ml-auto mr-1 opacity-95" strokeWidth={3} />
-                                                        {paid > 0 && <div className={`shrink-0 flex items-center justify-center rounded-full w-5 h-5 shadow-sm border border-black/10 ${bal === 0 ? 'bg-green-600' : 'bg-yellow-400'}`}>{bal === 0 ? <Icon name="Check" size={14} strokeWidth={4} /> : <span className="text-[12px] font-black text-black">฿</span>}</div>}
+                                                <div key={b.id} onClick={(e) => { e.stopPropagation(); setSelectedBooking(b); setBookingDeleteId(null); setModalPos({ x: e.clientX > 450 ? e.clientX - 450 : 20, y: 100 }); setIsModalOpen(true); }}
+                                                    className={`absolute h-[31px] mt-[1px] border border-black/10 flex items-center px-1 text-white shadow-sm cursor-pointer z-10 hover:brightness-110 ${S.color} ${start >= vStart ? 'rounded-l' : ''} ${end <= vEnd ? 'rounded-r' : ''}`}
+                                                    style={{ left: 100 + left, width: Math.max(width, 4) }}>
+                                                    <div className="flex items-center gap-1.5 w-full overflow-hidden leading-none bar-text">
+                                                        <Icon name={T.icon} size={16} />
+                                                        <span className="font-black text-[18px] uppercase tracking-tighter truncate">{b.firstName}</span>
+                                                        <span className="font-black text-[18px] opacity-70 truncate">{getDDMMM(start)}-{getDDMMM(end)}</span>
+                                                        <Icon name={S.icon} size={16} className="ml-auto opacity-90" />
+                                                        {paid > 0 && <div className={`shrink-0 w-4 h-4 rounded-full flex items-center justify-center border border-black/10 ${bal === 0 ? 'bg-green-600' : 'bg-yellow-400'}`}>{bal === 0 ? <Icon name="Check" size={12} /> : <span className="text-[10px] font-black text-black">฿</span>}</div>}
                                                     </div>
                                                 </div>
                                             );
@@ -397,66 +324,84 @@
                                 );
                             })}
                         </div>
-                    </div>
+                    </main>
 
                     {isModalOpen && selectedBooking && (
-                        <div className="fixed z-50 bg-white border-2 border-slate-600 shadow-[0_20px_60px_rgba(0,0,0,0.4)] rounded-lg w-[460px] overflow-hidden" style={{ left: modalPos.x, top: modalPos.y }}>
-                            <div onMouseDown={startModalDrag} className={`${STATUS_CONFIG[selectedBooking.status]?.color || 'bg-slate-500'} p-2.5 text-white flex justify-between items-center cursor-move transition-colors`}>
-                                <div className="flex items-center gap-2 flex-1 mr-2"><span className="bg-black/40 px-2 py-0.5 rounded text-[11px] font-black uppercase">{rooms.find(r => r.id === selectedBooking.roomId)?.name || '?'}-{selectedBooking.bed || '?'}</span><input className="bg-transparent border-none outline-none font-black text-xl uppercase w-1/2 placeholder:text-white/40" value={selectedBooking.firstName || ''} placeholder="FIRST" onChange={e => setSelectedBooking({...selectedBooking, firstName: e.target.value})} onMouseDown={e => e.stopPropagation()} /><input className="bg-transparent border-none outline-none font-black text-xl uppercase w-1/2 placeholder:text-white/40" value={selectedBooking.lastName || ''} placeholder="LAST" onChange={e => setSelectedBooking({...selectedBooking, lastName: e.target.value})} onMouseDown={e => e.stopPropagation()} /></div>
+                        <div className="fixed z-50 bg-white border-2 border-slate-800 shadow-2xl rounded-lg w-[460px] overflow-hidden" style={{ left: modalPos.x, top: modalPos.y }}>
+                            <div className={`${STATUS_CONFIG[selectedBooking.status]?.color || 'bg-slate-500'} p-3 text-white flex justify-between items-center cursor-move`}>
+                                <div className="flex items-center gap-2 flex-1 mr-2">
+                                    <span className="bg-black/30 px-2 py-0.5 rounded text-[10px] font-black uppercase">{rooms.find(r => r.id === selectedBooking.roomId)?.name}-{selectedBooking.bed}</span>
+                                    <input className="bg-transparent border-none outline-none font-black text-xl uppercase w-1/2 placeholder:text-white/50" value={selectedBooking.firstName} placeholder="FIRST" onChange={e => setSelectedBooking({...selectedBooking, firstName: e.target.value})} />
+                                    <input className="bg-transparent border-none outline-none font-black text-xl uppercase w-1/2 placeholder:text-white/50" value={selectedBooking.lastName} placeholder="LAST" onChange={e => setSelectedBooking({...selectedBooking, lastName: e.target.value})} />
+                                </div>
                                 <button onClick={() => setIsModalOpen(false)}><Icon name="X" size={24}/></button>
                             </div>
-                            <form onSubmit={(e) => { e.preventDefault(); handleSaveBooking(selectedBooking); }} className="p-4 space-y-4">
+                            <div className="p-4 space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="text-[10px] font-black text-gray-400 uppercase block mb-1">Country</label><select className="w-full border-b-2 border-slate-300 font-bold text-sm py-1 bg-transparent" value={selectedBooking.country || ''} onChange={e => setSelectedBooking({...selectedBooking, country: e.target.value})}>{COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                                    <div><label className="text-[10px] font-black text-gray-400 uppercase block mb-1">Guest Type</label><select className="w-full border-b-2 border-slate-300 font-bold text-sm py-1 bg-transparent uppercase" value={selectedBooking.volunteerType || 'standard'} onChange={e => setSelectedBooking({...selectedBooking, volunteerType: e.target.value})}>{Object.entries(GUEST_TYPES).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
+                                    <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Country</label><select className="w-full border-b-2 border-slate-200 font-bold text-sm py-1 outline-none focus:border-slate-800" value={selectedBooking.country} onChange={e => setSelectedBooking({...selectedBooking, country: e.target.value})}>{COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                                    <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Guest Type</label><select className="w-full border-b-2 border-slate-200 font-bold text-sm py-1 outline-none uppercase" value={selectedBooking.volunteerType} onChange={e => setSelectedBooking({...selectedBooking, volunteerType: e.target.value})}>{Object.entries(GUEST_TYPES).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="text-[10px] font-black text-gray-400 uppercase block mb-1">Check-In</label><input type="date" className="w-full border-2 border-slate-200 rounded p-2 text-sm font-bold" value={selectedBooking.checkIn || ''} onChange={e => setSelectedBooking({...selectedBooking, checkIn: e.target.value})} /></div>
-                                    <div><label className="text-[10px] font-black text-gray-400 uppercase block mb-1">Check-Out</label><input type="date" className="w-full border-2 border-slate-200 rounded p-2 text-sm font-bold" value={selectedBooking.checkOut || ''} onChange={e => setSelectedBooking({...selectedBooking, checkOut: e.target.value})} /></div>
+                                    <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Check-In</label><input type="date" className="w-full border-2 border-slate-100 p-2 font-bold text-sm" value={selectedBooking.checkIn} onChange={e => setSelectedBooking({...selectedBooking, checkIn: e.target.value})} /></div>
+                                    <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Check-Out</label><input type="date" className="w-full border-2 border-slate-100 p-2 font-bold text-sm" value={selectedBooking.checkOut} onChange={e => setSelectedBooking({...selectedBooking, checkOut: e.target.value})} /></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 items-end">
-                                    <div className="flex-1"><label className="text-[10px] font-black text-gray-400 uppercase block mb-1">Move Bed</label><select className="w-full border-b-2 border-slate-300 font-bold text-sm py-1 bg-transparent focus:border-slate-800 outline-none" value={`${selectedBooking.roomId}|${selectedBooking.bed}`} onChange={e => { const [rId, bNum] = e.target.value.split('|'); setSelectedBooking({...selectedBooking, roomId: rId, bed: parseInt(bNum)}); }}>{allBedOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></div>
-                                    <div className="flex-1"><label className="text-[10px] font-black text-gray-400 uppercase mb-1 block text-center">Status Action</label><div className="grid grid-cols-5 gap-1">{Object.entries(STATUS_CONFIG).map(([key, cfg]) => <button key={key} title={cfg.label} type="button" onClick={() => setSelectedBooking({...selectedBooking, status: key})} className={`flex flex-col items-center justify-center p-1 rounded border-2 transition-all ${selectedBooking.status === key ? `${cfg.color} text-white border-transparent shadow-lg scale-110 z-10` : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'}`}><Icon name={cfg.icon} size={16} strokeWidth={3} /><span className="text-[7px] font-black mt-1 uppercase text-center leading-tight">{cfg.label}</span></button>)}</div></div>
+                                    <div><label className="text-[10px] font-black text-gray-400 uppercase block mb-1">Move Bed</label><select className="w-full border-b-2 border-slate-300 font-bold text-sm py-1 bg-transparent focus:border-slate-800 outline-none" value={`${selectedBooking.roomId}|${selectedBooking.bed}`} onChange={e => { const [rId, bNum] = e.target.value.split('|'); setSelectedBooking({...selectedBooking, roomId: rId, bed: parseInt(bNum)}); }}>{allBedOptions.map(opt => <option key={opt.val} value={opt.val}>{opt.label}</option>)}</select></div>
+                                    <div className="flex-1"><label className="text-[10px] font-black text-gray-400 uppercase mb-1 block text-center">Status Action</label><div className="grid grid-cols-5 gap-1">{Object.entries(STATUS_CONFIG).map(([key, cfg]) => <button key={key} type="button" onClick={() => setSelectedBooking({...selectedBooking, status: key})} className={`flex flex-col items-center justify-center p-1 rounded border-2 transition-all ${selectedBooking.status === key ? `${cfg.color} text-white border-transparent shadow-lg scale-110 z-10` : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'}`}><Icon name={cfg.icon} size={16} /><span className="text-[7px] font-black mt-1 uppercase text-center leading-tight">{cfg.label}</span></button>)}</div></div>
                                 </div>
-                                <div className="bg-slate-100 border-2 border-slate-400 rounded-lg p-3 space-y-3">
-                                    <div className="flex justify-between items-center mb-1"><label className="text-[11px] font-black text-slate-800 uppercase flex items-center gap-1.5"><Icon name="CircleDollarSign" size={14}/> Deposits (฿)</label><div className={`px-2 py-1 rounded text-[11px] font-black flex items-center gap-1 shadow-sm ${depositTotals.bal === 0 && depositTotals.paid > 0 ? 'bg-green-600 text-white' : 'bg-yellow-400 text-black'}`}><Icon name={depositTotals.bal === 0 && depositTotals.paid > 0 ? "Check" : "Coins"} size={12} strokeWidth={4}/>BAL: ฿{depositTotals.bal}</div></div>
-                                    {['agoda', 'booking', 'hostelworld', 'cash'].map(key => (
-                                        <div key={key} className="grid grid-cols-[80px_1fr_100px] items-center gap-3">
-                                            <span className="text-[10px] font-black text-slate-500 uppercase">{key === 'cash' ? 'Cash' : key}</span>
-                                            <div className="relative"><span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">฿</span><input type="number" className="w-full border-b-2 border-slate-300 bg-transparent text-right font-black text-sm outline-none" value={selectedBooking.deposits?.[key]?.val || ''} onChange={e => setSelectedBooking({...selectedBooking, deposits: { ...selectedBooking.deposits, [key]: { ...selectedBooking.deposits?.[key], val: e.target.value } }})} /></div>
-                                            <button type="button" onClick={() => setSelectedBooking({...selectedBooking, deposits: { ...selectedBooking.deposits, [key]: { ...selectedBooking.deposits?.[key], ref: !selectedBooking.deposits?.[key]?.ref } }})} disabled={!selectedBooking.deposits?.[key]?.val} className={`h-7 rounded text-[10px] font-black uppercase flex items-center justify-center gap-1 border-2 transition-all ${selectedBooking.deposits?.[key]?.ref ? 'bg-green-600 border-green-700 text-white shadow-inner' : 'bg-slate-200 border-slate-300 text-slate-600 hover:bg-slate-300'}`}>{selectedBooking.deposits?.[key]?.ref && <Icon name="Check" size={12} strokeWidth={4} />}{selectedBooking.deposits?.[key]?.ref ? 'Refunded' : 'Refund?'}</button>
+                                <div className="bg-slate-50 border-2 border-slate-200 rounded p-3 space-y-2">
+                                    <label className="text-[11px] font-black text-slate-800 uppercase flex items-center gap-1"><Icon name="Coins" size={14}/> Deposits (฿)</label>
+                                    {['agoda', 'booking', 'hostelworld', 'cash'].map(k => (
+                                        <div key={k} className="flex items-center gap-4">
+                                            <span className="w-16 text-[10px] font-black text-slate-400 uppercase">{k}</span>
+                                            <input type="number" className="flex-1 bg-transparent border-b border-slate-300 font-bold text-sm outline-none" value={selectedBooking.deposits[k]?.val || ''} onChange={e => setSelectedBooking({...selectedBooking, deposits: {...selectedBooking.deposits, [k]: {...selectedBooking.deposits[k], val: e.target.value}}})} />
+                                            <button type="button" onClick={() => setSelectedBooking({...selectedBooking, deposits: {...selectedBooking.deposits, [k]: {...selectedBooking.deposits[k], ref: !selectedBooking.deposits[k]?.ref}}})} className={`px-2 py-1 rounded text-[9px] font-black uppercase ${selectedBooking.deposits[k]?.ref ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-500'}`}>{selectedBooking.deposits[k]?.ref ? 'Refunded' : 'Refund?'}</button>
                                         </div>
                                     ))}
                                 </div>
-                                <div className="flex justify-between pt-4 border-t-2 border-slate-300 gap-2">
-                                    <div className="relative">{bookingDeleteId === selectedBooking.id ? <button type="button" onClick={() => handleDeleteBooking(selectedBooking.id)} className="bg-red-600 text-white px-4 py-2 rounded text-[10px] font-black uppercase shadow-lg animate-pulse border-2 border-red-800">CONFIRM DELETE?</button> : <button type="button" onClick={() => setBookingDeleteId(selectedBooking.id)} className="text-red-600 hover:bg-red-50 px-3 py-2 rounded text-[10px] font-black uppercase">Delete Stay</button>}</div>
-                                    <div className="flex gap-2"><button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2 bg-gray-200 rounded text-xs font-black uppercase transition-colors">Cancel</button><button type="submit" className="px-8 py-2 bg-slate-900 text-white rounded text-xs font-black uppercase shadow-lg shadow-slate-300 transition-all">Save Changes</button></div>
+                                <div className="flex justify-between pt-4 border-t-2 border-slate-100">
+                                    {bookingDeleteId === selectedBooking.id ? (
+                                        <button onClick={() => handleDelete(selectedBooking.id)} className="bg-red-600 text-white px-4 py-2 rounded text-[10px] font-black uppercase animate-pulse">Confirm Delete?</button>
+                                    ) : (
+                                        <button onClick={() => setBookingDeleteId(selectedBooking.id)} className="text-red-500 text-[10px] font-black uppercase hover:underline">Delete Stay</button>
+                                    )}
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-100 rounded text-xs font-black uppercase">Cancel</button>
+                                        <button onClick={() => handleSave(selectedBooking)} className="px-8 py-2 bg-slate-800 text-white rounded text-xs font-black uppercase shadow-lg">Save Changes</button>
+                                    </div>
                                 </div>
-                            </form>
+                            </div>
                         </div>
                     )}
 
                     {isRoomManagerOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                            <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden border-2 border-slate-800">
-                                <div className="bg-slate-900 text-white p-3 flex justify-between items-center text-xs font-black uppercase tracking-widest"><span>Rooms Config</span><button onClick={() => setIsRoomManagerOpen(false)}><Icon name="X" size={18}/></button></div>
-                                <div className="p-4 space-y-3 max-h-[60vh] overflow-auto">
-                                    {rooms.map((room) => (
-                                        <div key={room.id} className="flex items-center gap-3 p-3 bg-slate-50 border-2 border-slate-200 rounded-md shadow-sm">
-                                            <div className="flex-1"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Room Name</label><input className="w-full bg-transparent font-black text-sm uppercase outline-none focus:border-b-2 border-slate-800" value={room.name || ''} onChange={(e) => { if (!user || !db) return; window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', room.id), { name: e.target.value }, { merge: true }); }} /></div>
-                                            <div className="w-16"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Beds</label><input type="number" className="w-full bg-transparent font-black text-sm outline-none focus:border-b-2 border-slate-800" value={room.beds || 0} onChange={(e) => { if (!user || !db) return; window.FB.setDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', room.id), { beds: parseInt(e.target.value) || 1 }, { merge: true }); }} /></div>
-                                            <div className="flex flex-col gap-1 shrink-0">{roomDeleteId === room.id ? <button onClick={async () => { if (!user || !db) return; await window.FB.deleteDoc(window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'rooms', room.id)); setRoomDeleteId(null); }} className="bg-red-600 text-white px-2 py-1 rounded text-[8px] font-black uppercase animate-pulse border border-red-800">KILL IT</button> : <button onClick={() => setRoomDeleteId(room.id)} className="text-red-400 p-2 hover:text-red-700 transition-colors"><Icon name="Trash2" size={20}/></button>}</div>
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border-2 border-slate-800">
+                                <div className="bg-slate-800 text-white p-4 flex justify-between items-center text-xs font-black uppercase tracking-widest"><span>Rooms Manager</span><button onClick={() => setIsRoomManagerOpen(false)}><Icon name="X" size={20}/></button></div>
+                                <div className="p-4 space-y-3 max-h-[70vh] overflow-auto">
+                                    {rooms.map(r => (
+                                        <div key={r.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded border-2 border-slate-200 shadow-sm">
+                                            <div className="flex-1"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Name</label><input className="w-full bg-transparent font-black uppercase text-sm border-b border-slate-300" value={r.name} onChange={e => updateRoom(r.id, { name: e.target.value })} /></div>
+                                            <div className="w-12"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Beds</label><input type="number" className="w-full bg-transparent font-black text-sm border-b border-slate-300" value={r.beds} onChange={e => updateRoom(r.id, { beds: parseInt(e.target.value) || 1 })} /></div>
+                                            <div className="flex flex-col gap-1 shrink-0">{roomDeleteId === r.id ? <button onClick={async () => { await window.FB.deleteDoc(window.FB.doc(window.FB.getFirestore(), 'artifacts', APP_ID, 'public', 'data', 'rooms', r.id)); setRoomDeleteId(null); }} className="bg-red-600 text-white px-2 py-1 rounded text-[8px] font-black uppercase animate-pulse border border-red-800">KILL IT</button> : <button onClick={() => setRoomDeleteId(r.id)} className="text-red-400 p-2 hover:text-red-600 mt-2"><Icon name="Trash2" size={18}/></button>}</div>
                                         </div>
                                     ))}
-                                    <button onClick={async () => { if (!user || !db) return; await window.FB.addDoc(window.FB.collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { name: 'NEW', beds: 4, collapsed: false, order: rooms.length + 1 }); }} className="w-full py-4 border-4 border-dashed rounded-lg text-xs font-black text-gray-400 uppercase hover:border-blue-500 transition-all">+ Add Room</button>
+                                    <button onClick={async () => { await window.FB.addDoc(window.FB.collection(window.FB.getFirestore(), 'artifacts', APP_ID, 'public', 'data', 'rooms'), { name: 'NEW', beds: 4, collapsed: false, order: rooms.length + 1 }); }} className="w-full py-4 border-4 border-dashed rounded-lg font-black text-xs text-slate-400 uppercase hover:border-blue-500 transition-all">+ Add New Room</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <footer className="bg-white border-t-2 border-slate-400 px-4 py-2 flex justify-between items-center text-[10px] text-gray-600 font-black uppercase tracking-tight shrink-0">
-                        <div className="flex gap-4 items-center overflow-x-auto no-scrollbar">{Object.entries(STATUS_CONFIG).map(([k,v]) => <div key={k} className="flex items-center gap-1.5 whitespace-nowrap"><div className={`w-3.5 h-3.5 rounded border border-black/10 ${v.color}`}></div> {v.label}</div>)}<div className="h-4 w-px bg-slate-300 mx-2"></div>{Object.entries(GUEST_TYPES).map(([k,v]) => <div key={k} className="flex items-center gap-1 whitespace-nowrap mr-3"><Icon name={v.icon} size={12} strokeWidth={3}/> {v.label}</div>)}</div>
-                        <div className="flex items-center gap-1.5 ml-auto whitespace-nowrap"><div className="flex items-center gap-1"><div className="w-4 h-4 rounded-full bg-yellow-400 flex items-center justify-center text-[8px] text-black shadow-sm">฿</div> Bal Due</div><div className="flex items-center gap-1"><div className="w-4 h-4 rounded-full bg-green-600 flex items-center justify-center shadow-sm"><Icon name="Check" size={8} className="text-white" strokeWidth={4}/></div> Cleared</div></div>
+                    <footer className="bg-white border-t-2 border-slate-300 px-4 py-2 flex justify-between items-center text-[10px] text-slate-500 font-black uppercase shrink-0 overflow-x-auto no-scrollbar">
+                        <div className="flex gap-4 items-center whitespace-nowrap">
+                            {Object.entries(STATUS_CONFIG).map(([k,v]) => <div key={k} className="flex items-center gap-1"><div className={`w-3 h-3 rounded ${v.color}`}></div> {v.label}</div>)}
+                            <div className="h-4 w-px bg-slate-300 mx-2"></div>
+                            {Object.entries(GUEST_TYPES).map(([k,v]) => <div key={k} className="flex items-center gap-1"><Icon name={v.icon} size={12} /> {v.label}</div>)}
+                        </div>
+                        <div className="flex items-center gap-4 ml-8 whitespace-nowrap">
+                            <div className="flex items-center gap-1"><div className="w-4 h-4 rounded-full bg-yellow-400 flex items-center justify-center text-[8px] text-black">฿</div> Bal Due</div>
+                            <div className="flex items-center gap-1"><div className="w-4 h-4 rounded-full bg-green-600 flex items-center justify-center shadow-sm"><Icon name="Check" size={10} className="text-white" /></div> Paid</div>
+                        </div>
                     </footer>
                 </div>
             );
