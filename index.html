@@ -3,414 +3,540 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VCAL | Guest Calendar</title>
-    <!-- Favicon: High-Contrast Calendar Logo -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3QgeD0iMiIgeT0iNCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjZWY0NDQ0IiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMiA4aDI4VjRhNCA0IDAgMCAwLTQtNEg2YTQgNCAwIDAgMC00IDR6IiBmaWxsPSIjZWY0NDQ0Ii8+PHJlY3QgeD0iOCIgeT0iMiIgd2lkdGg9IjQiIGhlaWdodD0iNCIgcng9IjEiIGZpbGw9IiMzMzQxNTUiLz48cmVjdCB4PSIyMCIgeT0iMiIgd2lkdGg9IjQiIGhlaWdodD0iNCIgcng9IjEiIGZpbGw9IiMzMzQxNTUiLz48dGV4dCB4PSI1MCUiIHk9IjIyIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiMxZDQwN2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlY8L3RleHQ+PC9zdmc+">
-
-    <!-- Pre-load Libraries -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <title>Staff Tracker | Dorm & Deposits</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Roboto+Condensed:wght@400;700;900&display=swap');
+        
+        body { 
+            font-family: 'Roboto Condensed', sans-serif; 
+            background: #f1f5f9; 
+            color: #1e293b; 
+            overflow-x: hidden;
+            font-size: 1.2rem; 
+        }
+
+        /* Responsive Breakpoints */
+        :root { --sidebar-w: 70px; --days: 14; }
+        @media (min-width: 650px) { :root { --days: 21; } --sidebar-w: 80px; }
+        @media (min-width: 950px) { :root { --days: 28; } --sidebar-w: 90px; }
+        @media (min-width: 1150px) { :root { --days: 35; } --sidebar-w: 100px; }
+
+        .timeline-grid { 
+            display: grid; 
+            grid-template-columns: var(--sidebar-w) repeat(var(--days), 1fr); 
+        }
+
+        .day-column { border-right: 1px solid #e2e8f0; height: 100%; position: relative; cursor: cell; }
+        .day-column:hover { background: rgba(59, 130, 246, 0.1); }
+        .bed-row { height: 34px; border-bottom: 1px solid #cbd5e1; position: relative; }
+        
+        .staff-bar {
+            position: absolute;
+            height: 26px;
+            top: 4px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            color: white;
+            cursor: pointer;
+            z-index: 10;
+            font-size: 1rem;
+            font-weight: 700;
+            border: 1px solid rgba(0,0,0,0.2);
+            text-transform: uppercase;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .status-future { background-color: #2563eb; } 
+        .status-here { background-color: #059669; }   
+        .status-left { background-color: #475569; }   
+        
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 100; }
+        .modal-overlay.active { display: flex; }
+        
+        .alert-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(2px); align-items: center; justify-content: center; z-index: 200; }
+        .alert-modal-overlay.active { display: flex; }
+
+        /* Superbold Icon Font Styling */
+        .icon-font { font-family: 'Archivo Black', sans-serif; font-size: 14px; line-height: 1; }
+        .icon-box { 
+            width: 22px; height: 22px; border-radius: 3px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        .icon-paid { background: #ef4444 !important; color: white !important; opacity: 1 !important; } 
+        .icon-ref { background: #22c55e !important; color: white !important; opacity: 1 !important; }  
+        .icon-none { background: rgba(0,0,0,0.05) !important; color: rgba(0,0,0,0.15) !important; border-color: rgba(0,0,0,0.1) !important; opacity: 0.3; }
+
+        .legend-item { display: flex; align-items: center; gap: 4px; font-size: 1rem; font-weight: 900; color: #475569; }
+        
+        .bar-sticky-content {
+            position: sticky; left: 0; display: flex; align-items: center; padding: 0 8px; width: fit-content; max-width: 100vw; white-space: nowrap;
+        }
+
+        .month-divider { border-left: 3px solid white; }
+
+        input, select, textarea { font-size: 1.1rem !important; padding: 2px 6px !important; border-radius: 4px !important; border: 1px solid #cbd5e1 !important; font-weight: 700 !important; }
+        .field-label { font-size: 16px; font-weight: 900; color: #64748b; text-transform: uppercase; display: block; }
+
+        /* Date Picker Overlays */
+        .date-input-box { position: relative; width: 100%; height: 38px; display: flex; align-items: center; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; }
+        .date-input-box span { font-weight: 900; color: #2563eb; margin-left: 8px; flex: 1; }
+        .date-input-box input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 5; }
+        .date-input-box i { margin-right: 8px; color: #64748b; }
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        html, body, #root { height: 100%; margin: 0; padding: 0; background-color: #f1f5f9; font-family: sans-serif; }
-        
-        /* Initial Boot Loader */
-        #boot-loader {
-            position: fixed; inset: 0; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; background: white; z-index: 9999;
-        }
-        .spinner {
-            width: 40px; height: 40px; border: 4px solid #f3f3f3;
-            border-top: 4px solid #1e293b; border-radius: 50%; animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        .bar-text { text-shadow: 1px 1px 0px rgba(0,0,0,0.2); }
-        .grid-line { border-right: 1px solid #e2e8f0; }
-        .row-line { border-bottom: 1px solid #cbd5e1; }
-        .highlight-col { background-color: rgba(59, 130, 246, 0.08); }
     </style>
 </head>
-<body>
-    <div id="boot-loader">
-        <div class="spinner"></div>
-        <div style="margin-top: 15px; font-weight: 900; letter-spacing: -0.05em; color: #1e293b; text-transform: uppercase;">Syncing VCAL...</div>
+<body class="p-1 lg:p-2">
+
+    <div class="max-w-[1950px] mx-auto">
+        <!-- Header -->
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-1 gap-1 bg-white p-3 rounded-lg shadow-sm border border-slate-200">
+            <div class="flex items-center gap-4">
+                <div class="bg-blue-600 p-2 rounded-lg text-white"><i data-lucide="users" size="24"></i></div>
+                <div>
+                    <h1 class="text-xl font-black text-slate-800 tracking-tighter leading-none uppercase">Staff Tracker</h1>
+                    <div class="flex gap-4 mt-1">
+                        <div class="legend-item"><span class="w-4 h-4 rounded-full bg-blue-600"></span> FUTURE</div>
+                        <div class="legend-item"><span class="w-4 h-4 rounded-full bg-green-600"></span> HERE</div>
+                        <div class="legend-item"><span class="w-4 h-4 rounded-full bg-slate-500"></span> LEFT</div>
+                        <div id="legend-icons" class="flex items-center gap-3 ml-4"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
+                    <button onclick="prevPeriod()" class="p-1 hover:bg-white rounded"><i data-lucide="chevron-left" size="20"></i></button>
+                    <div class="date-input-box mx-2" style="width: 120px; height: 32px;">
+                        <span id="current-jump-display" style="font-size: 0.9rem">--</span>
+                        <input type="date" id="jump-date" onchange="jumpToDate(this.value)">
+                    </div>
+                    <button onclick="nextPeriod()" class="p-1 hover:bg-white rounded"><i data-lucide="chevron-right" size="20"></i></button>
+                </div>
+                <button onclick="goToday()" class="px-4 py-1.5 bg-white border border-slate-300 rounded font-bold text-xs uppercase">Today</button>
+                <button onclick="openStaffModal()" class="px-4 py-1.5 bg-blue-600 text-white rounded shadow-lg font-bold text-xs uppercase flex items-center gap-2">
+                    <i data-lucide="plus" size="16"></i> Add Staff
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded shadow-md border border-slate-300 overflow-hidden">
+            <div id="month-header" class="timeline-grid bg-slate-800 text-white text-[12px] font-bold uppercase tracking-widest py-1.5">
+                <div class="border-r border-slate-700"></div>
+                <div id="month-labels" class="contents"></div>
+            </div>
+            <div class="timeline-grid bg-slate-100 border-b border-slate-300">
+                <div class="p-1 text-[13px] font-black text-slate-500 uppercase flex items-center justify-center border-r border-slate-300">BED</div>
+                <div id="timeline-header" class="contents"></div>
+            </div>
+            <div id="timeline-body" class="relative"></div>
+        </div>
     </div>
 
-    <div id="root"></div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        window.FB = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, query, getDocs };
-        window.dispatchEvent(new Event('firebase-initialized'));
-    </script>
-
-    <script type="text/babel">
-        const { useState, useMemo, useEffect, useRef } = React;
-
-        // Helpers
-        function formatDateLocal(date) {
-            const d = new Date(date);
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-
-        function getDDMMM(dateStr) {
-            if (!dateStr) return '';
-            const parts = dateStr.split('-');
-            const d = new Date(parts[0], parts[1] - 1, parts[2]);
-            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-            return `${d.getDate()}${months[d.getMonth()]}`;
-        }
-
-        const Icon = ({ name, size = 16, className = "" }) => {
-            const ref = useRef(null);
-            useEffect(() => {
-                if (ref.current && window.lucide && name) {
-                    ref.current.innerHTML = `<i data-lucide="${name}"></i>`;
-                    window.lucide.createIcons({
-                        icons: { [name]: window.lucide.icons[name] },
-                        attrs: { width: size, height: size, 'stroke-width': 3, class: className },
-                        nameAttr: 'data-lucide'
-                    });
-                }
-            }, [name, size, className]);
-            return <span ref={ref} className="inline-flex items-center justify-center shrink-0" />;
-        };
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyDN_AIEAJB5G1bcR5kXSMmjlWd9aXLLYak",
-            authDomain: "wetvcal.firebaseapp.com",
-            projectId: "wetvcal",
-            storageBucket: "wetvcal.firebasestorage.app",
-            messagingSenderId: "380675879193",
-            appId: "1:380675879193:web:8f3cc25411137208441588"
-        };
-
-        const APP_ID = 'wetvcal-prod-v1';
-
-        const STATUS_CONFIG = {
-            future: { color: 'bg-blue-500', icon: 'Calendar', label: 'FUTURE' },
-            checkedIn: { color: 'bg-green-500', icon: 'UserCheck', label: 'IN' },
-            checkedOut: { color: 'bg-gray-400', icon: 'LogOut', label: 'OUT' },
-            noShow: { color: 'bg-orange-500', icon: 'UserX', label: 'NO-SHOW' },
-            problem: { color: 'bg-red-500', icon: 'AlertOctagon', label: 'PROBLEM' },
-        };
-
-        const GUEST_TYPES = {
-            standard: { icon: 'User', label: 'Standard' },
-            art: { icon: 'Palette', label: 'Art' },
-            social: { icon: 'Share2', label: 'Social' },
-            bar: { icon: 'GlassWater', label: 'Bar' },
-            other: { icon: 'HelpCircle', label: 'Other' },
-        };
-
-        const COUNTRIES = ["Thailand", "UK", "USA", "Germany", "France", "Israel", "Russia", "Japan", "Australia", "Canada", "Spain", "Italy", "Netherlands", "Sweden", "Switzerland", "China", "South Korea", "Brazil", "Mexico", "Other"].sort();
-
-        function App() {
-            const [user, setUser] = useState(null);
-            const [rooms, setRooms] = useState([]);
-            const [bookings, setBookings] = useState([]);
-            const [viewStartDate, setViewStartDate] = useState(new Date(2026, 2, 1));
-            const [daysToShow, setDaysToShow] = useState(60);
-            const [loading, setLoading] = useState(true);
-            const [hoveredCol, setHoveredCol] = useState(null);
+    <!-- Main Entry Modal -->
+    <div id="staff-modal" class="modal-overlay p-2">
+        <div class="bg-white w-full max-w-xl rounded-lg shadow-2xl overflow-hidden border-2 border-slate-800">
+            <div class="bg-slate-900 p-3 text-white flex justify-between items-center">
+                <h3 id="modal-title" class="text-md font-bold uppercase tracking-tighter">Staff Record</h3>
+                <button type="button" onclick="closeStaffModal()"><i data-lucide="x"></i></button>
+            </div>
             
-            const [selectedBooking, setSelectedBooking] = useState(null);
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [isRoomManagerOpen, setIsRoomManagerOpen] = useState(false);
-            const [bookingDeleteId, setBookingDeleteId] = useState(null);
-            const [roomDeleteId, setRoomDeleteId] = useState(null);
-            const [modalPos, setModalPos] = useState({ x: 100, y: 100 });
+            <form id="staff-form" class="p-4 pt-1 space-y-3">
+                <input type="hidden" id="staff-id">
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="flex flex-col">
+                        <label class="field-label">Name</label>
+                        <input type="text" id="staff-name" required class="bg-slate-50 uppercase">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="field-label">Country</label>
+                        <select id="staff-country" class="bg-slate-50"></select>
+                    </div>
+                </div>
 
-            // Initialize DB and Auth
-            useEffect(() => {
-                const init = async () => {
-                    const fb = window.FB;
-                    if (!fb) return;
-                    const app = fb.initializeApp(firebaseConfig);
-                    const db = fb.getFirestore(app);
-                    const auth = fb.getAuth(app);
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="flex flex-col">
+                        <label class="field-label">Room</label>
+                        <input type="text" id="room-name" required class="bg-slate-50 uppercase text-center">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="field-label">Bed #</label>
+                        <input type="number" id="bed-number" required class="bg-slate-50 text-center">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="field-label">Status</label>
+                        <select id="staff-status" class="bg-slate-50">
+                            <option value="future">FUTURE</option>
+                            <option value="here">HERE</option>
+                            <option value="left">LEFT</option>
+                        </select>
+                    </div>
+                </div>
 
-                    fb.onAuthStateChanged(auth, async (u) => {
-                        if (!u) {
-                            try { await fb.signInAnonymously(auth); } catch(e) { console.error(e); }
-                        } else {
-                            setUser(u);
-                            const bPath = fb.collection(db, 'artifacts', APP_ID, 'public', 'data', 'bookings');
-                            fb.onSnapshot(bPath, (s) => {
-                                setBookings(s.docs.map(d => ({ id: d.id, ...d.data() })));
-                                setLoading(false);
-                                document.getElementById('boot-loader')?.remove();
-                            });
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="flex flex-col">
+                        <label class="field-label">In (Arrival)</label>
+                        <div class="date-input-box">
+                            <span id="ov-in">---</span> <i data-lucide="calendar" size="18"></i>
+                            <input type="date" id="check-in" required onchange="syncLabels()">
+                        </div>
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="field-label">Out (Departure)</label>
+                        <div class="date-input-box">
+                            <span id="ov-out">---</span> <i data-lucide="calendar" size="18"></i>
+                            <input type="date" id="check-out" required onchange="syncLabels()">
+                        </div>
+                    </div>
+                </div>
 
-                            const rPath = fb.collection(db, 'artifacts', APP_ID, 'public', 'data', 'rooms');
-                            fb.onSnapshot(rPath, (s) => {
-                                const data = s.docs.map(d => ({ id: d.id, ...d.data() }));
-                                if (data.length === 0) {
-                                    fb.addDoc(rPath, { name: '210', beds: 8, collapsed: false, order: 1 });
-                                    fb.addDoc(rPath, { name: '211', beds: 16, collapsed: false, order: 2 });
-                                } else {
-                                    setRooms(data.sort((a,b) => (a.order || 0) - (b.order || 0)));
-                                }
-                            });
+                <div class="bg-slate-100 p-3 pt-1 rounded border-2 border-slate-300">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-[20px] font-black text-slate-800 uppercase">DEPOSITS</label>
+                        <div class="flex gap-6">
+                            <div class="text-right">
+                                <label class="field-label !text-blue-500">Held</label>
+                                <div class="font-black text-2xl leading-none" id="display-held">฿0</div>
+                            </div>
+                            <div class="text-right">
+                                <label class="field-label !text-blue-500">Refund Due</label>
+                                <div class="font-black text-blue-600 text-2xl leading-none" id="display-refund-due">฿0</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 gap-1">
+                        <div class="flex items-center gap-3 bg-blue-700 p-1.5 rounded text-white font-bold text-sm uppercase">
+                            <div class="flex items-center gap-2 w-32" id="modal-icon-d"></div>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="paid-deposit" onchange="calcRefund()" class="w-4 h-4"> Paid</label>
+                            <label class="flex items-center gap-1 cursor-pointer ml-auto"><input type="checkbox" id="ref-deposit" onchange="calcRefund()" class="w-4 h-4"> Refunded</label>
+                        </div>
+                        <div class="flex items-center gap-3 bg-white p-1.5 rounded border border-slate-200 text-sm font-black uppercase">
+                            <div class="flex items-center gap-2 w-32" id="modal-icon-h"></div>
+                            <input type="number" id="amt-hostelworld" oninput="calcRefund()" placeholder="0" class="w-16 p-0 border-b-2 font-black outline-none">
+                            <label class="flex items-center gap-1 cursor-pointer ml-auto text-slate-400 font-bold"><input type="checkbox" id="ref-hostelworld" onchange="calcRefund()" class="w-4 h-4"> Refunded</label>
+                        </div>
+                        <div class="flex items-center gap-3 bg-white p-1.5 rounded border border-slate-200 text-sm font-black uppercase">
+                            <div class="flex items-center gap-2 w-32" id="modal-icon-b"></div>
+                            <input type="number" id="amt-booking" oninput="calcRefund()" placeholder="0" class="w-16 p-0 border-b-2 font-black outline-none">
+                            <label class="flex items-center gap-1 cursor-pointer ml-auto text-slate-400 font-bold"><input type="checkbox" id="ref-booking" onchange="calcRefund()" class="w-4 h-4"> Refunded</label>
+                        </div>
+                        <div class="flex items-center gap-3 bg-white p-1.5 rounded border border-slate-200 text-sm font-black uppercase">
+                            <div class="flex items-center gap-2 w-32" id="modal-icon-a"></div>
+                            <input type="number" id="amt-agoda" oninput="calcRefund()" placeholder="0" class="w-16 p-0 border-b-2 font-black outline-none">
+                            <label class="flex items-center gap-1 cursor-pointer ml-auto text-slate-400 font-bold"><input type="checkbox" id="ref-agoda" onchange="calcRefund()" class="w-4 h-4"> Refunded</label>
+                        </div>
+                    </div>
+                </div>
+
+                <textarea id="staff-notes" rows="3" class="w-full bg-slate-50 border border-slate-300 font-bold text-xs" style="min-height: 80px" placeholder="NOTES..."></textarea>
+
+                <div class="flex justify-between items-center pt-0">
+                    <button type="button" id="delete-btn" onclick="requestDelete()" class="text-red-600 font-bold text-xs uppercase hover:underline">Delete Record</button>
+                    <div class="flex gap-2 ml-auto">
+                        <button type="button" onclick="closeStaffModal()" class="px-4 py-1.5 bg-slate-200 rounded font-bold text-xs uppercase">Cancel</button>
+                        <button type="submit" class="px-8 py-1.5 bg-blue-600 text-white rounded font-bold text-xs uppercase shadow-lg">Save Record</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Alert Modal -->
+    <div id="alert-modal" class="alert-modal-overlay">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full overflow-hidden border-2 border-slate-800 animate-in zoom-in duration-200">
+            <div id="alert-header" class="bg-slate-900 p-3 text-white font-bold uppercase text-center text-sm">Attention</div>
+            <div class="p-6 text-center">
+                <p id="alert-message" class="font-bold text-slate-700 leading-tight text-lg"></p>
+                <div id="alert-actions" class="mt-6 flex gap-2 justify-center">
+                    <button id="alert-cancel" onclick="closeAlert()" class="hidden px-6 py-2 bg-slate-200 rounded-lg font-bold text-xs uppercase">Cancel</button>
+                    <button id="alert-confirm" onclick="closeAlert()" class="px-10 py-2 bg-blue-600 text-white rounded-lg font-bold text-xs uppercase">Okay</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DEPOSIT_VAL = 3000;
+        const COUNTRIES = ["Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Korea, North", "Korea, South", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Momtenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"].sort();
+
+        // Icon Generators using Archivo Black
+        const makeIcon = (char, bg, col = "white") => `<div class="icon-box" style="background:${bg}"><span class="icon-font" style="color:${col}">${char}</span></div>`;
+        const ICONS = {
+            D: makeIcon("$", "#eab308", "#1e293b"),
+            H: makeIcon("H", "#f15a24"),
+            B: makeIcon("B", "#003580"),
+            A: makeIcon("A", "#888")
+        };
+
+        let staff = JSON.parse(localStorage.getItem('staff_tracker_v14')) || [];
+        let viewStart = new Date(); viewStart.setHours(12,0,0,0);
+
+        const mNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        const to15MAR = d => !d || isNaN(d.getTime()) ? "---" : `${d.getDate()}${mNames[d.getMonth()]}${d.getFullYear().toString().substr(-2)}`;
+
+        function showAlert(msg, isConfirm = false, onConfirm = null) {
+            const modal = document.getElementById('alert-modal');
+            const msgEl = document.getElementById('alert-message');
+            const confirmBtn = document.getElementById('alert-confirm');
+            const cancelBtn = document.getElementById('alert-cancel');
+            msgEl.innerText = msg;
+            cancelBtn.className = isConfirm ? 'px-6 py-2 bg-slate-200 rounded-lg font-black text-sm uppercase' : 'hidden';
+            confirmBtn.innerText = isConfirm ? 'Yes, Delete' : 'Okay';
+            confirmBtn.className = isConfirm ? 'px-10 py-2 bg-red-600 text-white rounded-lg font-black text-sm uppercase' : 'px-10 py-2 bg-blue-600 text-white rounded-lg font-black text-sm uppercase';
+            confirmBtn.onclick = () => { if (onConfirm) onConfirm(); closeAlert(); };
+            modal.style.display = 'flex';
+        }
+        function closeAlert() { document.getElementById('alert-modal').style.display = 'none'; }
+
+        window.onload = () => {
+            const countrySelect = document.getElementById('staff-country');
+            COUNTRIES.forEach(c => { const opt = document.createElement('option'); opt.value = c; opt.innerText = c; countrySelect.appendChild(opt); });
+            
+            document.getElementById('legend-icons').innerHTML = `
+                <div class="legend-item">${ICONS.D} DEPOSIT</div>
+                <div class="legend-item">${ICONS.H} HW</div>
+                <div class="legend-item">${ICONS.B} BDC</div>
+                <div class="legend-item">${ICONS.A} AGODA</div>
+            `;
+            document.getElementById('modal-icon-d').innerHTML = `${ICONS.D} DEPOSIT`;
+            document.getElementById('modal-icon-h').innerHTML = `${ICONS.H} HOSTELWORLD`;
+            document.getElementById('modal-icon-b').innerHTML = `${ICONS.B} BOOKING.COM`;
+            document.getElementById('modal-icon-a').innerHTML = `${ICONS.A} AGODA`;
+
+            window.addEventListener('resize', render);
+            render();
+        };
+
+        function syncLabels() {
+            const iIn = document.getElementById('check-in').value;
+            const iOut = document.getElementById('check-out').value;
+            document.getElementById('ov-in').innerText = iIn ? to15MAR(new Date(iIn + "T12:00:00")) : "---";
+            document.getElementById('ov-out').innerText = iOut ? to15MAR(new Date(iOut + "T12:00:00")) : "---";
+        }
+
+        function render() {
+            const daysToShow = (window.innerWidth >= 1150) ? 35 : (window.innerWidth >= 950 ? 28 : (window.innerWidth >= 650 ? 21 : 14));
+            document.documentElement.style.setProperty('--days', daysToShow);
+            document.getElementById('current-jump-display').innerText = to15MAR(viewStart);
+            renderTimeline(daysToShow);
+            localStorage.setItem('staff_tracker_v14', JSON.stringify(staff));
+            lucide.createIcons();
+        }
+
+        function renderTimeline(daysToShow) {
+            const header = document.getElementById('timeline-header');
+            const body = document.getElementById('timeline-body');
+            const monthLabels = document.getElementById('month-labels');
+            header.innerHTML = monthLabels.innerHTML = body.innerHTML = '';
+            const days = [];
+            for (let i = 0; i < daysToShow; i++) {
+                const d = new Date(viewStart); d.setDate(viewStart.getDate() + i); days.push(d);
+            }
+            let currentMonth = -1; let currentSpan = 0;
+            days.forEach((d, i) => {
+                if (d.getMonth() !== currentMonth) {
+                    if (currentMonth !== -1) {
+                        const mDiv = document.createElement('div');
+                        mDiv.style.gridColumn = `span ${currentSpan}`;
+                        mDiv.className = "flex items-center justify-center month-divider";
+                        mDiv.innerText = `${mNames[currentMonth]} ${days[i-1].getFullYear()}`;
+                        monthLabels.appendChild(mDiv);
+                    }
+                    currentMonth = d.getMonth(); currentSpan = 1;
+                } else currentSpan++;
+                if (i === days.length - 1) {
+                    const mDiv = document.createElement('div');
+                    mDiv.style.gridColumn = `span ${currentSpan}`;
+                    mDiv.className = "flex items-center justify-center month-divider";
+                    mDiv.innerText = `${mNames[currentMonth]} ${d.getFullYear()}`;
+                    monthLabels.appendChild(mDiv);
+                }
+            });
+            days.forEach(d => {
+                const isToday = d.toDateString() === new Date().toDateString();
+                const col = document.createElement('div');
+                col.className = `flex flex-col items-center justify-center border-r border-slate-300 ${isToday ? 'bg-blue-100' : ''}`;
+                col.innerHTML = `<div class="text-[12px] font-black text-slate-500 uppercase leading-none">${d.toLocaleDateString('en-US', {weekday:'short'})}</div><div class="text-[18px] font-black ${isToday ? 'text-blue-600' : 'text-slate-800'}">${d.getDate()}</div>`;
+                header.appendChild(col);
+            });
+            const beds = []; staff.forEach(s => { const k = `${s.room}-${s.bed}`; if(!beds.includes(k)) beds.push(k); });
+            while (beds.length < 15) beds.push(`Z-TEMP-${beds.length}`);
+            beds.sort((a,b) => a.localeCompare(b, undefined, {numeric: true}));
+            beds.forEach(bedKey => {
+                const row = document.createElement('div'); row.className = 'timeline-grid bed-row';
+                const isTemp = bedKey.startsWith('Z-TEMP-');
+                row.innerHTML = `<div class="p-1 border-r border-slate-300 bg-slate-50 text-[16px] font-black text-slate-500 flex items-center justify-center uppercase tracking-tighter">${isTemp ? '—' : bedKey}</div>`;
+                for(let i=0; i<daysToShow; i++) {
+                    const cell = document.createElement('div'); cell.className = 'day-column';
+                    cell.onclick = () => { const [r, b] = isTemp ? ["", ""] : bedKey.split('-'); quickAdd(r, b, days[i]); };
+                    row.appendChild(cell);
+                }
+                if (!isTemp) {
+                    const [r, b] = bedKey.split('-');
+                    staff.filter(s => s.room === r && s.bed === b).forEach(s => {
+                        const start = new Date(s.checkIn + "T12:00:00"); const end = new Date(s.checkOut + "T12:00:00");
+                        const viewEnd = new Date(days[daysToShow - 1]); viewEnd.setHours(23,59,59,999);
+                        if (start <= viewEnd && end >= viewStart) {
+                            const diffStart = Math.max(0, (start - viewStart) / (1000 * 60 * 60 * 24));
+                            const diffEnd = Math.min(daysToShow, (end - viewStart) / (1000 * 60 * 60 * 24));
+                            const left = (diffStart / daysToShow) * 100; const width = ((diffEnd - diffStart) / daysToShow) * 100;
+                            const bar = document.createElement('div');
+                            bar.className = `staff-bar status-${s.status}`;
+                            bar.style.left = `calc(var(--sidebar-w) + ${left}%)`; bar.style.width = `calc(${width}%)`;
+                            const getAmt = p => Number(s.ledger[p]?.amt || 0);
+                            const held = (s.ledger.deposit.paid ? DEPOSIT_VAL : 0) + getAmt('agoda') + getAmt('hostelworld') + getAmt('booking');
+                            const ref = (s.ledger.deposit.ref ? DEPOSIT_VAL : 0) + (s.ledger.agoda.ref ? getAmt('agoda') : 0) + (s.ledger.hostelworld.ref ? getAmt('hostelworld') : 0) + (s.ledger.booking.ref ? getAmt('booking') : 0);
+                            const due = held - ref;
+                            
+                            const getBarIcon = (char, p, isDep = false) => {
+                                const data = s.ledger[p];
+                                const hasValue = isDep ? data.paid : getAmt(p) > 0;
+                                const cls = !hasValue ? 'icon-none' : (data.ref ? 'icon-ref' : 'icon-paid');
+                                const bg = isDep ? "#eab308" : (p === 'hostelworld' ? "#f15a24" : (p === 'booking' ? "#003580" : "#555"));
+                                const tCol = (isDep && !data.ref && hasValue) ? "#1e293b" : "white";
+                                return `<div class="icon-box ${cls}" style="${hasValue ? 'background:'+bg : ''}"><span class="icon-font" style="color:${tCol}">${char}</span></div>`;
+                            };
+
+                            bar.innerHTML = `
+                                <div class="bar-sticky-content">
+                                    <span class="mr-2 truncate">${s.name} | ${to15MAR(start).slice(0,-2)}-${to15MAR(end).slice(0,-2)}</span>
+                                    <div class="flex gap-1 items-center scale-90 shrink-0">
+                                        ${getBarIcon("$", 'deposit', true)}
+                                        ${getBarIcon("H", 'hostelworld')}
+                                        ${getBarIcon("B", 'booking')}
+                                        ${getBarIcon("A", 'agoda')}
+                                        ${due > 0 ? `<span class="bg-black/40 px-1.5 py-0.5 rounded text-[16px] font-black ml-1">฿${due}</span>` : ''}
+                                    </div>
+                                </div>
+                            `;
+                            bar.onclick = (e) => { e.stopPropagation(); editStaff(s.id); };
+                            row.appendChild(bar);
                         }
                     });
-                };
-                if (window.FB) init();
-                else window.addEventListener('firebase-initialized', init);
-            }, []);
-
-            useEffect(() => {
-                const update = () => setDaysToShow(Math.floor((window.innerWidth - 100) / 20));
-                update();
-                window.addEventListener('resize', update);
-                return () => window.removeEventListener('resize', update);
-            }, []);
-
-            const days = useMemo(() => {
-                const arr = [];
-                const start = new Date(viewStartDate);
-                start.setHours(0,0,0,0);
-                for (let i = 0; i < daysToShow; i++) {
-                    const d = new Date(start);
-                    d.setDate(start.getDate() + i);
-                    arr.push(d);
                 }
-                return arr;
-            }, [viewStartDate, daysToShow]);
-
-            const flatBeds = useMemo(() => {
-                const res = [];
-                rooms.forEach(r => {
-                    res.push({ type: 'header', roomId: r.id, name: r.name, collapsed: r.collapsed });
-                    if (!r.collapsed) {
-                        for (let i = 1; i <= (r.beds || 0); i++) res.push({ type: 'bed', roomId: r.id, name: r.name, bed: i });
-                    }
-                });
-                return res;
-            }, [rooms]);
-
-            const allBedOptions = useMemo(() => {
-                const opts = [];
-                rooms.forEach(r => {
-                    for (let i = 1; i <= (r.beds || 0); i++) opts.push({ label: `${r.name}-${i}`, val: `${r.id}|${i}` });
-                });
-                return opts;
-            }, [rooms]);
-
-            const handleAdd = (roomId, bed, date) => {
-                if (!user) return;
-                const checkIn = formatDateLocal(date);
-                const outDate = new Date(date); outDate.setDate(outDate.getDate() + 7);
-                const checkOut = formatDateLocal(outDate);
-                setSelectedBooking({ id: 'new-' + Date.now(), firstName: '', lastName: '', country: 'Thailand', volunteerType: 'standard', roomId, bed, checkIn, checkOut, status: 'future', deposits: { agoda: { val: 0, ref: false }, booking: { val: 0, ref: false }, hostelworld: { val: 0, ref: false }, cash: { val: 0, ref: false } } });
-                setBookingDeleteId(null);
-                setModalPos({ x: window.innerWidth / 2 - 230, y: 100 });
-                setIsModalOpen(true);
-            };
-
-            const handleSave = async (data) => {
-                if (!user || !window.FB) return;
-                const fb = window.FB;
-                const db = fb.getFirestore();
-                setIsModalOpen(false);
-                try {
-                    let bId = data.id;
-                    if (bId.startsWith('new-')) {
-                        bId = fb.doc(fb.collection(db, 'any')).id;
-                    }
-                    const docRef = fb.doc(db, 'artifacts', APP_ID, 'public', 'data', 'bookings', bId);
-                    const { id, ...payload } = data;
-                    await fb.setDoc(docRef, payload);
-                } catch (e) { alert("Save Error"); }
-            };
-
-            const handleDelete = async (id) => {
-                if (!user || !id || id.startsWith('new-')) { setIsModalOpen(false); return; }
-                setIsModalOpen(false);
-                const fb = window.FB;
-                const db = fb.getFirestore();
-                await fb.deleteDoc(fb.doc(db, 'artifacts', APP_ID, 'public', 'data', 'bookings', id));
-            };
-
-            const updateRoom = (id, upd) => {
-                if (!user) return;
-                window.FB.setDoc(window.FB.doc(window.FB.getFirestore(), 'artifacts', APP_ID, 'public', 'data', 'rooms', id), upd, { merge: true });
-            };
-
-            const depositTotals = useMemo(() => {
-                if (!selectedBooking) return { paid: 0, ref: 0, bal: 0 };
-                const deps = selectedBooking.deposits || {};
-                const paid = Object.values(deps).reduce((sum, d) => sum + (Number(d.val) || 0), 0);
-                const ref = Object.values(deps).reduce((sum, d) => sum + (d.ref ? Number(d.val) || 0 : 0), 0);
-                return { paid, ref, bal: paid - ref };
-            }, [selectedBooking]);
-
-            if (loading && !user) return null;
-
-            return (
-                <div className="flex flex-col h-screen overflow-hidden select-none">
-                    <header className="flex items-center justify-between px-4 py-2 bg-white border-b-2 border-slate-300 shadow-sm z-40 shrink-0">
-                        <div className="flex items-center gap-4">
-                            <h1 className="text-xl font-black text-slate-800 tracking-tighter uppercase">VCAL</h1>
-                            <div className="flex items-center bg-gray-100 rounded border-2 border-slate-300 p-1">
-                                <button onClick={() => setViewStartDate(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n; })} className="p-1 hover:bg-white"><Icon name="ChevronLeft" size={20}/></button>
-                                <span className="px-4 font-black text-xs uppercase text-slate-700 w-32 text-center">{viewStartDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
-                                <button onClick={() => setViewStartDate(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n; })} className="p-1 hover:bg-white"><Icon name="ChevronRight" size={20}/></button>
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => { setIsRoomManagerOpen(true); setRoomDeleteId(null); }} className="px-4 py-2 bg-slate-800 text-white rounded font-black text-xs uppercase shadow hover:scale-105 active:scale-95 transition-all">Rooms</button>
-                            <button onClick={() => setViewStartDate(new Date(new Date().setHours(0,0,0,0)))} className="px-4 py-2 bg-white border-2 border-slate-800 rounded font-black text-xs uppercase">Today</button>
-                        </div>
-                    </header>
-
-                    <main className="flex-1 overflow-auto relative bg-white" onMouseLeave={() => setHoveredCol(null)}>
-                        <div className="inline-block min-w-fit pr-[2px]">
-                            <div className="sticky top-0 z-20 flex bg-white border-b-2 border-slate-400 shadow-sm h-10">
-                                <div className="sticky left-0 z-30 bg-slate-50 border-r-2 border-slate-400 w-[100px] flex items-center justify-center text-[11px] font-black uppercase text-slate-500">BED</div>
-                                {days.map((d, i) => (
-                                    <div key={i} onMouseEnter={() => setHoveredCol(i)} className={`flex flex-col items-center justify-center border-r border-slate-200 w-[20px] text-[10px] font-bold ${hoveredCol === i ? 'bg-blue-100/50' : ''} ${d.getDate() === 1 ? 'border-l-4 border-l-blue-600 bg-blue-50' : ''}`}>
-                                        <span>{d.getDate()}</span>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {flatBeds.map((row) => {
-                                if (row.type === 'header') return <div key={row.roomId} className="flex bg-slate-700 text-white font-black text-[12px] uppercase h-7 items-center cursor-pointer" onClick={() => updateRoom(row.roomId, { collapsed: !row.collapsed })}><div className="sticky left-0 z-10 bg-inherit border-r-2 border-slate-500 px-2 flex items-center gap-2 w-[100px]"><Icon name="ChevronDown" className={row.collapsed ? '-rotate-90' : ''} size={14} /> {row.name}</div></div>;
-                                
-                                return (
-                                    <div key={`${row.roomId}-${row.bed}`} className="flex row-line h-[33px] group relative">
-                                        <div className="sticky left-0 z-10 bg-slate-50 border-r-2 border-slate-400 w-[100px] flex items-center px-2 text-[12px] font-black text-slate-600 group-hover:bg-blue-50">{row.name}-{row.bed}</div>
-                                        {days.map((d, di) => <div key={di} onMouseEnter={() => setHoveredCol(di)} onClick={() => handleAdd(row.roomId, row.bed, d)} className={`grid-line w-[20px] cursor-crosshair h-full ${hoveredCol === di ? 'bg-blue-50/50' : ''}`} />)}
-                                        
-                                        {bookings.filter(b => b.roomId === row.roomId && b.bed === row.bed).map(b => {
-                                            const start = b.checkIn; const end = b.checkOut;
-                                            const vStart = formatDateLocal(days[0]); const vEnd = formatDateLocal(days[days.length-1]);
-                                            if (end <= vStart || start > vEnd) return null;
-                                            const dStart = start < vStart ? vStart : start; const dEnd = end > vEnd ? vEnd : end;
-                                            const getDiff = (s, e) => (new Date(e) - new Date(s)) / 86400000;
-                                            const left = getDiff(vStart, dStart) * 20; const width = getDiff(dStart, dEnd) * 20;
-                                            const S = STATUS_CONFIG[b.status] || STATUS_CONFIG.future;
-                                            const T = GUEST_TYPES[b.volunteerType || 'standard'] || GUEST_TYPES.standard;
-                                            const paid = Object.values(b.deposits || {}).reduce((s,d) => s + (Number(d.val)||0), 0);
-                                            const bal = Object.values(b.deposits || {}).reduce((s,d) => s + (Number(d.val)||0) - (d.ref?Number(d.val)||0 : 0), 0);
-                                            return (
-                                                <div key={b.id} onClick={(e) => { e.stopPropagation(); setSelectedBooking(b); setBookingDeleteId(null); setModalPos({ x: e.clientX > 450 ? e.clientX - 450 : 20, y: 100 }); setIsModalOpen(true); }}
-                                                    className={`absolute h-[31px] mt-[1px] border border-black/10 flex items-center px-1 text-white shadow-sm cursor-pointer z-10 hover:brightness-110 ${S.color} ${start >= vStart ? 'rounded-l' : ''} ${end <= vEnd ? 'rounded-r' : ''}`}
-                                                    style={{ left: 100 + left, width: Math.max(width, 4) }}>
-                                                    <div className="flex items-center gap-1.5 w-full overflow-hidden leading-none bar-text">
-                                                        <Icon name={T.icon} size={16} />
-                                                        <span className="font-black text-[18px] uppercase tracking-tighter truncate">{b.firstName}</span>
-                                                        <span className="font-black text-[18px] opacity-70 truncate">{getDDMMM(start)}-{getDDMMM(end)}</span>
-                                                        <Icon name={S.icon} size={16} className="ml-auto opacity-90" />
-                                                        {paid > 0 && <div className={`shrink-0 w-4 h-4 rounded-full flex items-center justify-center border border-black/10 ${bal === 0 ? 'bg-green-600' : 'bg-yellow-400'}`}>{bal === 0 ? <Icon name="Check" size={12} /> : <span className="text-[10px] font-black text-black">฿</span>}</div>}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </main>
-
-                    {isModalOpen && selectedBooking && (
-                        <div className="fixed z-50 bg-white border-2 border-slate-800 shadow-2xl rounded-lg w-[460px] overflow-hidden" style={{ left: modalPos.x, top: modalPos.y }}>
-                            <div className={`${STATUS_CONFIG[selectedBooking.status]?.color || 'bg-slate-500'} p-3 text-white flex justify-between items-center cursor-move`}>
-                                <div className="flex items-center gap-2 flex-1 mr-2">
-                                    <span className="bg-black/30 px-2 py-0.5 rounded text-[10px] font-black uppercase">{rooms.find(r => r.id === selectedBooking.roomId)?.name}-{selectedBooking.bed}</span>
-                                    <input className="bg-transparent border-none outline-none font-black text-xl uppercase w-1/2 placeholder:text-white/50" value={selectedBooking.firstName} placeholder="FIRST" onChange={e => setSelectedBooking({...selectedBooking, firstName: e.target.value})} />
-                                    <input className="bg-transparent border-none outline-none font-black text-xl uppercase w-1/2 placeholder:text-white/50" value={selectedBooking.lastName} placeholder="LAST" onChange={e => setSelectedBooking({...selectedBooking, lastName: e.target.value})} />
-                                </div>
-                                <button onClick={() => setIsModalOpen(false)}><Icon name="X" size={24}/></button>
-                            </div>
-                            <div className="p-4 space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Country</label><select className="w-full border-b-2 border-slate-200 font-bold text-sm py-1 outline-none focus:border-slate-800" value={selectedBooking.country} onChange={e => setSelectedBooking({...selectedBooking, country: e.target.value})}>{COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                                    <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Guest Type</label><select className="w-full border-b-2 border-slate-200 font-bold text-sm py-1 outline-none uppercase" value={selectedBooking.volunteerType} onChange={e => setSelectedBooking({...selectedBooking, volunteerType: e.target.value})}>{Object.entries(GUEST_TYPES).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Check-In</label><input type="date" className="w-full border-2 border-slate-100 p-2 font-bold text-sm" value={selectedBooking.checkIn} onChange={e => setSelectedBooking({...selectedBooking, checkIn: e.target.value})} /></div>
-                                    <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Check-Out</label><input type="date" className="w-full border-2 border-slate-100 p-2 font-bold text-sm" value={selectedBooking.checkOut} onChange={e => setSelectedBooking({...selectedBooking, checkOut: e.target.value})} /></div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 items-end">
-                                    <div><label className="text-[10px] font-black text-gray-400 uppercase block mb-1">Move Bed</label><select className="w-full border-b-2 border-slate-300 font-bold text-sm py-1 bg-transparent focus:border-slate-800 outline-none" value={`${selectedBooking.roomId}|${selectedBooking.bed}`} onChange={e => { const [rId, bNum] = e.target.value.split('|'); setSelectedBooking({...selectedBooking, roomId: rId, bed: parseInt(bNum)}); }}>{allBedOptions.map(opt => <option key={opt.val} value={opt.val}>{opt.label}</option>)}</select></div>
-                                    <div className="flex-1"><label className="text-[10px] font-black text-gray-400 uppercase mb-1 block text-center">Status Action</label><div className="grid grid-cols-5 gap-1">{Object.entries(STATUS_CONFIG).map(([key, cfg]) => <button key={key} type="button" onClick={() => setSelectedBooking({...selectedBooking, status: key})} className={`flex flex-col items-center justify-center p-1 rounded border-2 transition-all ${selectedBooking.status === key ? `${cfg.color} text-white border-transparent shadow-lg scale-110 z-10` : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'}`}><Icon name={cfg.icon} size={16} /><span className="text-[7px] font-black mt-1 uppercase text-center leading-tight">{cfg.label}</span></button>)}</div></div>
-                                </div>
-                                <div className="bg-slate-50 border-2 border-slate-200 rounded p-3 space-y-2">
-                                    <label className="text-[11px] font-black text-slate-800 uppercase flex items-center gap-1"><Icon name="Coins" size={14}/> Deposits (฿)</label>
-                                    {['agoda', 'booking', 'hostelworld', 'cash'].map(k => (
-                                        <div key={k} className="flex items-center gap-4">
-                                            <span className="w-16 text-[10px] font-black text-slate-400 uppercase">{k}</span>
-                                            <input type="number" className="flex-1 bg-transparent border-b border-slate-300 font-bold text-sm outline-none" value={selectedBooking.deposits[k]?.val || ''} onChange={e => setSelectedBooking({...selectedBooking, deposits: {...selectedBooking.deposits, [k]: {...selectedBooking.deposits[k], val: e.target.value}}})} />
-                                            <button type="button" onClick={() => setSelectedBooking({...selectedBooking, deposits: {...selectedBooking.deposits, [k]: {...selectedBooking.deposits[k], ref: !selectedBooking.deposits[k]?.ref}}})} className={`px-2 py-1 rounded text-[9px] font-black uppercase ${selectedBooking.deposits[k]?.ref ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-500'}`}>{selectedBooking.deposits[k]?.ref ? 'Refunded' : 'Refund?'}</button>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="flex justify-between pt-4 border-t-2 border-slate-100">
-                                    {bookingDeleteId === selectedBooking.id ? (
-                                        <button onClick={() => handleDelete(selectedBooking.id)} className="bg-red-600 text-white px-4 py-2 rounded text-[10px] font-black uppercase animate-pulse">Confirm Delete?</button>
-                                    ) : (
-                                        <button onClick={() => setBookingDeleteId(selectedBooking.id)} className="text-red-500 text-[10px] font-black uppercase hover:underline">Delete Stay</button>
-                                    )}
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-100 rounded text-xs font-black uppercase">Cancel</button>
-                                        <button onClick={() => handleSave(selectedBooking)} className="px-8 py-2 bg-slate-800 text-white rounded text-xs font-black uppercase shadow-lg">Save Changes</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {isRoomManagerOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border-2 border-slate-800">
-                                <div className="bg-slate-800 text-white p-4 flex justify-between items-center text-xs font-black uppercase tracking-widest"><span>Rooms Manager</span><button onClick={() => setIsRoomManagerOpen(false)}><Icon name="X" size={20}/></button></div>
-                                <div className="p-4 space-y-3 max-h-[70vh] overflow-auto">
-                                    {rooms.map(r => (
-                                        <div key={r.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded border-2 border-slate-200 shadow-sm">
-                                            <div className="flex-1"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Name</label><input className="w-full bg-transparent font-black uppercase text-sm border-b border-slate-300" value={r.name} onChange={e => updateRoom(r.id, { name: e.target.value })} /></div>
-                                            <div className="w-12"><label className="text-[9px] font-black text-gray-400 block mb-0.5 uppercase">Beds</label><input type="number" className="w-full bg-transparent font-black text-sm border-b border-slate-300" value={r.beds} onChange={e => updateRoom(r.id, { beds: parseInt(e.target.value) || 1 })} /></div>
-                                            <div className="flex flex-col gap-1 shrink-0">{roomDeleteId === r.id ? <button onClick={async () => { await window.FB.deleteDoc(window.FB.doc(window.FB.getFirestore(), 'artifacts', APP_ID, 'public', 'data', 'rooms', r.id)); setRoomDeleteId(null); }} className="bg-red-600 text-white px-2 py-1 rounded text-[8px] font-black uppercase animate-pulse border border-red-800">KILL IT</button> : <button onClick={() => setRoomDeleteId(r.id)} className="text-red-400 p-2 hover:text-red-600 mt-2"><Icon name="Trash2" size={18}/></button>}</div>
-                                        </div>
-                                    ))}
-                                    <button onClick={async () => { await window.FB.addDoc(window.FB.collection(window.FB.getFirestore(), 'artifacts', APP_ID, 'public', 'data', 'rooms'), { name: 'NEW', beds: 4, collapsed: false, order: rooms.length + 1 }); }} className="w-full py-4 border-4 border-dashed rounded-lg font-black text-xs text-slate-400 uppercase hover:border-blue-500 transition-all">+ Add New Room</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <footer className="bg-white border-t-2 border-slate-300 px-4 py-2 flex justify-between items-center text-[10px] text-slate-500 font-black uppercase shrink-0 overflow-x-auto no-scrollbar">
-                        <div className="flex gap-4 items-center whitespace-nowrap">
-                            {Object.entries(STATUS_CONFIG).map(([k,v]) => <div key={k} className="flex items-center gap-1"><div className={`w-3 h-3 rounded ${v.color}`}></div> {v.label}</div>)}
-                            <div className="h-4 w-px bg-slate-300 mx-2"></div>
-                            {Object.entries(GUEST_TYPES).map(([k,v]) => <div key={k} className="flex items-center gap-1"><Icon name={v.icon} size={12} /> {v.label}</div>)}
-                        </div>
-                        <div className="flex items-center gap-4 ml-8 whitespace-nowrap">
-                            <div className="flex items-center gap-1"><div className="w-4 h-4 rounded-full bg-yellow-400 flex items-center justify-center text-[8px] text-black">฿</div> Bal Due</div>
-                            <div className="flex items-center gap-1"><div className="w-4 h-4 rounded-full bg-green-600 flex items-center justify-center shadow-sm"><Icon name="Check" size={10} className="text-white" /></div> Paid</div>
-                        </div>
-                    </footer>
-                </div>
-            );
+                body.appendChild(row);
+            });
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+        function quickAdd(room, bed, date) {
+            openStaffModal();
+            if(room) document.getElementById('room-name').value = room;
+            if(bed) document.getElementById('bed-number').value = bed;
+            const y = date.getFullYear(); const m = String(date.getMonth() + 1).padStart(2, '0'); const d = String(date.getDate()).padStart(2, '0');
+            document.getElementById('check-in').value = `${y}-${m}-${d}`;
+            const out = new Date(date); out.setDate(date.getDate() + 14);
+            const oy = out.getFullYear(); const om = String(out.getMonth() + 1).padStart(2, '0'); const od = String(out.getDate()).padStart(2, '0');
+            document.getElementById('check-out').value = `${oy}-${om}-${od}`;
+            syncLabels();
+        }
 
-    <script src="https://loren-6q.github.io/WETNav/nav.js"></script>
+        function calcRefund() {
+            const isChecked = id => document.getElementById(id).checked;
+            const getVal = id => Number(document.getElementById(id).value) || 0;
+            let h = isChecked('paid-deposit') ? DEPOSIT_VAL : 0;
+            h += getVal('amt-agoda') + getVal('amt-hostelworld') + getVal('amt-booking');
+            let r = isChecked('ref-deposit') ? DEPOSIT_VAL : 0;
+            if (isChecked('ref-agoda')) r += getVal('amt-agoda');
+            if (isChecked('ref-hostelworld')) r += getVal('amt-hostelworld');
+            if (isChecked('ref-booking')) r += getVal('amt-booking');
+            document.getElementById('display-held').innerText = `฿${h.toLocaleString()}`;
+            document.getElementById('display-refund-due').innerText = `฿${(h - r).toLocaleString()}`;
+        }
+
+        document.getElementById('staff-form').onsubmit = (e) => {
+            e.preventDefault();
+            const id = document.getElementById('staff-id').value || Math.random().toString(36).substr(2, 9);
+            const entry = {
+                id,
+                name: document.getElementById('staff-name').value.trim().toUpperCase(),
+                status: document.getElementById('staff-status').value,
+                room: document.getElementById('room-name').value.trim().toUpperCase(),
+                bed: document.getElementById('bed-number').value,
+                checkIn: document.getElementById('check-in').value,
+                checkOut: document.getElementById('check-out').value,
+                country: document.getElementById('staff-country').value,
+                notes: document.getElementById('staff-notes').value,
+                ledger: {
+                    deposit: { paid: document.getElementById('paid-deposit').checked, ref: document.getElementById('ref-deposit').checked },
+                    agoda: { amt: document.getElementById('amt-agoda').value, ref: document.getElementById('ref-agoda').checked },
+                    hostelworld: { amt: document.getElementById('amt-hostelworld').value, ref: document.getElementById('ref-hostelworld').checked },
+                    booking: { amt: document.getElementById('amt-booking').value, ref: document.getElementById('ref-booking').checked }
+                }
+            };
+            const conflict = staff.find(s => s.id !== id && s.room === entry.room && s.bed === entry.bed && entry.checkIn < s.checkOut && s.checkIn < entry.checkOut);
+            if (conflict) { showAlert(`BED OCCUPIED ERROR:\n\n${conflict.name} is using Bed ${entry.room}-${entry.bed} until ${to15MAR(new Date(conflict.checkOut + "T12:00:00"))}.`); return; }
+            const idx = staff.findIndex(s => s.id === id);
+            if (idx > -1) staff[idx] = entry; else staff.push(entry);
+            closeStaffModal(); render();
+        };
+
+        function editStaff(id) {
+            const s = staff.find(x => x.id === id); if (!s) return;
+            document.getElementById('modal-title').innerText = "Edit Record";
+            document.getElementById('staff-id').value = s.id;
+            document.getElementById('staff-name').value = s.name;
+            document.getElementById('staff-status').value = s.status;
+            document.getElementById('room-name').value = s.room;
+            document.getElementById('bed-number').value = s.bed;
+            document.getElementById('check-in').value = s.checkIn;
+            document.getElementById('check-out').value = s.checkOut;
+            document.getElementById('staff-country').value = s.country;
+            document.getElementById('staff-notes').value = s.notes || "";
+            syncLabels();
+            const L = s.ledger;
+            document.getElementById('paid-deposit').checked = L.deposit.paid;
+            document.getElementById('ref-deposit').checked = L.deposit.ref;
+            document.getElementById('amt-agoda').value = L.agoda.amt || "";
+            document.getElementById('ref-agoda').checked = L.agoda.ref;
+            document.getElementById('amt-hostelworld').value = L.hostelworld.amt || "";
+            document.getElementById('ref-hostelworld').checked = L.hostelworld.ref;
+            document.getElementById('amt-booking').value = L.booking.amt || "";
+            document.getElementById('ref-booking').checked = L.booking.ref;
+            calcRefund();
+            document.getElementById('delete-btn').style.display = 'block';
+            document.getElementById('staff-modal').style.display = 'flex';
+        }
+
+        function requestDelete() {
+            const name = document.getElementById('staff-name').value;
+            showAlert(`Are you sure you want to permanently delete the record for ${name}?`, true, () => {
+                const id = document.getElementById('staff-id').value;
+                staff = staff.filter(s => s.id !== id);
+                localStorage.setItem('staff_tracker_v14', JSON.stringify(staff));
+                closeStaffModal(); render();
+            });
+        }
+
+        function jumpToDate(val) { 
+            if(!val) return; 
+            const d = new Date(val + "T12:00:00");
+            if (isNaN(d.getTime())) return;
+            viewStart = d;
+            document.getElementById('jump-date').value = ""; 
+            render(); 
+        }
+
+        function nextPeriod() { viewStart.setDate(viewStart.getDate() + 7); render(); }
+        function prevPeriod() { viewStart.setDate(viewStart.getDate() - 7); render(); }
+        function goToday() { viewStart = new Date(); viewStart.setHours(12,0,0,0); render(); }
+        
+        function openStaffModal() {
+            const modal = document.getElementById('staff-modal');
+            const form = document.getElementById('staff-form');
+            if (form) form.reset();
+            document.getElementById('staff-id').value = "";
+            document.getElementById('modal-title').innerText = "Add Staff Member";
+            document.getElementById('delete-btn').style.display = 'none';
+            modal.style.display = 'flex';
+            calcRefund(); syncLabels();
+        }
+        function closeStaffModal() { document.getElementById('staff-modal').style.display = 'none'; }
+    </script>
 </body>
 </html>
