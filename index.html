@@ -1,15 +1,3 @@
-<!-- 
-  VOL CALENDAR - PRODUCTION VERSION
-  
-  HOW TO GO LIVE (Multi-Device Sync):
-  1. Go to console.firebase.google.com and create a free project named "VolCalendar".
-  2. In Firebase: Build > Authentication > Sign-in Method > Enable "Anonymous".
-  3. In Firebase: Build > Firestore Database > Create Database > "Start in Test Mode".
-  4. Project Overview > Web Icon (</>) > Register App.
-  5. Copy the 'firebaseConfig' object and paste it into the 'personalConfig' constant below.
-  6. Deploy this file to your GitHub Pages.
--->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -328,9 +316,20 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
+        // Firebase Configuration
+        const personalConfig = {
+            apiKey: "AIzaSyDd_i6as2LtvNWE1I44HFCU0LyJ4iO7KKQ",
+            authDomain: "volcalendar1.firebaseapp.com",
+            projectId: "volcalendar1",
+            storageBucket: "volcalendar1.firebasestorage.app",
+            messagingSenderId: "1081934202587",
+            appId: "1:1081934202587:web:28b226efb37216a2442efe"
+        };
+
+        const envConfig = JSON.parse(window.__firebase_config || '{}');
+        const finalConfig = personalConfig.apiKey ? personalConfig : envConfig;
         const appId = window.__app_id || 'vol-calendar-wet-v1';
-        const app = initializeApp(firebaseConfig);
+        const app = initializeApp(finalConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
