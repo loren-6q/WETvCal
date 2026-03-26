@@ -28,7 +28,7 @@
         @media (min-width: 1150px) { :root { --days: 35; } --sidebar-w: 105px; }
 
         .timeline-grid { display: grid; grid-template-columns: var(--sidebar-w) repeat(var(--days), 1fr); }
-        .day-column { border-right: 1px solid #e2e8f0; height: 100%; position: relative; cursor: cell; min-width: 30px; }
+        .day-column { border-right: 1px solid #e2e8f0; height: 100%; position: relative; cursor: cell; min-width: 25px; }
         .day-column:hover { background: rgba(59, 130, 246, 0.1); }
         .bed-row { height: 38px; border-bottom: 1px solid #cbd5e1; position: relative; }
         
@@ -49,6 +49,7 @@
         .alert-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(2px); align-items: center; justify-content: center; z-index: 200; }
         .alert-modal-overlay.active { display: flex; }
 
+        /* Icon Font Centering */
         .icon-font { font-family: 'Bungee', cursive; font-size: 18px; line-height: 1; transform: translateY(2px); }
         .icon-box { 
             width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -56,7 +57,7 @@
         }
         .icon-paid { background: #ef4444 !important; color: white !important; } 
         .icon-ref { background: #22c55e !important; color: white !important; }  
-        .icon-none { background: rgba(255,255,255,0.05) !important; color: rgba(255,255,255,0.2) !important; border-color: rgba(0,0,0,0.05) !important; opacity: 0.3; }
+        .icon-none { background: rgba(255,255,255,0.05) !important; color: rgba(255,255,255,0.2) !important; border-color: rgba(255,255,255,0.05) !important; opacity: 0.3; }
 
         .legend-item { display: flex; align-items: center; gap: 4px; font-size: 1rem; font-weight: 900; color: #475569; text-transform: uppercase; }
         .bar-sticky-content { position: sticky; left: 0; display: flex; align-items: center; padding: 0 8px; width: fit-content; max-width: 100vw; white-space: nowrap; }
@@ -80,13 +81,14 @@
         .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Logo Styling */
+        /* Logo Layering: Bright People over Ghost V */
         .logo-box { width: 48px; height: 48px; position: relative; display: flex; align-items: center; justify-content: center; background: #2563eb; border-radius: 10px; overflow: hidden; }
         .logo-v-back { 
-            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Bungee', cursive; font-size: 48px; 
-            color: rgba(255,255,255,0.2); z-index: 1; pointer-events: none;
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Bungee', cursive; font-size: 52px; 
+            color: rgba(255,255,255,0.18); z-index: 1; pointer-events: none;
+            top: 50%; left: 50%; transform: translate(-50%, -48%);
         }
-        .logo-people-front { position: relative; z-index: 2; color: #fff; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+        .logo-people-front { position: relative; z-index: 2; color: #fff; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
     </style>
 </head>
 <body class="p-1 lg:p-2">
@@ -94,7 +96,7 @@
     <div id="boot-loader" class="loading-overlay">
         <div class="spinner"></div>
         <div class="mt-4 font-black text-slate-800 uppercase tracking-widest text-center px-4">
-            <span id="sync-status">Initializing Vol Calendar...</span>
+            <span id="sync-status">Cloud Syncing...</span>
         </div>
     </div>
 
@@ -105,7 +107,7 @@
                 <div class="flex items-center gap-3">
                     <div class="logo-box">
                         <div class="logo-v-back">V</div>
-                        <i data-lucide="users" class="logo-people-front" size="32"></i>
+                        <i data-lucide="users" class="logo-people-front" size="34"></i>
                     </div>
                     <h1 class="text-2xl font-black text-slate-800 tracking-tighter leading-none uppercase">Vol Calendar</h1>
                 </div>
@@ -286,9 +288,31 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
-        const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'vol-calendar-wet-v1';
-        const app = initializeApp(firebaseConfig);
+        // To enable multi-device sync on your own website:
+        // Paste your firebaseConfig inside this personalConfig object.
+        const personalConfig = {// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDd_i6as2LtvNWE1I44HFCU0LyJ4iO7KKQ",
+  authDomain: "volcalendar1.firebaseapp.com",
+  projectId: "volcalendar1",
+  storageBucket: "volcalendar1.firebasestorage.app",
+  messagingSenderId: "1081934202587",
+  appId: "1:1081934202587:web:28b226efb37216a2442efe"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);}; 
+
+        const envConfig = JSON.parse(window.__firebase_config || '{}');
+        const finalConfig = personalConfig.apiKey ? personalConfig : envConfig;
+        const appId = window.__app_id || 'vol-calendar-wet-v1'; 
+
+        const app = initializeApp(finalConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
@@ -307,16 +331,19 @@
         const to15MAR = d => !d || isNaN(d.getTime()) ? "---" : `${d.getDate()}${mNames[d.getMonth()]}${d.getFullYear().toString().substr(-2)}`;
 
         const init = async () => {
-            if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) { await signInWithCustomToken(auth, window.__initial_auth_token); } else { await signInAnonymously(auth); }
+            const token = typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : null;
+            if (token) { await signInWithCustomToken(auth, token); } else { await signInAnonymously(auth); }
+
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'staff'), (snap) => {
                         staff = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                         document.getElementById('boot-loader').style.display = 'none';
                         window.render();
-                    }, (err) => console.error("Snapshot error:", err));
+                    }, (err) => console.error("Firebase Error:", err));
                 }
             });
+
             const cSel = document.getElementById('staff-country');
             countries.forEach(c => { const opt = document.createElement('option'); opt.value = c; opt.innerText = c; cSel.appendChild(opt); });
             document.getElementById('footer-icons').innerHTML = `<div class="legend-item">${ICONS.D} DEPOSIT</div><div class="legend-item">${ICONS.H} HW</div><div class="legend-item">${ICONS.B} BDC</div><div class="legend-item">${ICONS.A} AGODA</div>`;
@@ -363,7 +390,7 @@
                 header.appendChild(col);
             });
             const beds = []; staff.forEach(s => { const k = `${s.room}-${s.bed}`; if(!beds.includes(k)) beds.push(k); });
-            while (beds.length < 15) beds.push(`Z-TEMP-${beds.length}`);
+            while (beds.length < 20) beds.push(`Z-TEMP-${beds.length}`);
             beds.sort((a,b) => a.localeCompare(b, undefined, {numeric: true}));
             beds.forEach(bedKey => {
                 const row = document.createElement('div'); row.className = 'timeline-grid bed-row';
@@ -371,10 +398,7 @@
                 row.innerHTML = `<div class="p-1 border-r border-slate-300 bg-slate-50 text-[16px] font-black text-slate-500 flex items-center justify-center uppercase tracking-tighter">${isTemp ? '—' : bedKey}</div>`;
                 for(let i=0; i<daysToShow; i++) {
                     const cell = document.createElement('div'); cell.className = 'day-column';
-                    cell.onclick = () => { 
-                        const parts = isTemp ? ["", ""] : bedKey.split('-');
-                        window.quickAdd(parts[0], parts[1], days[i]); 
-                    }; 
+                    cell.onclick = () => { const parts = isTemp ? ["", ""] : bedKey.split('-'); window.quickAdd(parts[0], parts[1], days[i]); }; 
                     row.appendChild(cell);
                 }
                 if (!isTemp) {
@@ -421,9 +445,9 @@
 
         window.sortDatabase = (key) => { if(sortKey === key) sortAsc = !sortAsc; else { sortKey = key; sortAsc = true; } renderDatabase(); };
         window.switchTab = (t) => { document.getElementById('calendar-view').style.display = t === 'calendar' ? 'block' : 'none'; document.getElementById('database-view').style.display = t === 'database' ? 'block' : 'none'; document.getElementById('tab-cal').classList.toggle('active', t === 'calendar'); document.getElementById('tab-db').classList.toggle('active', t === 'database'); if (t === 'database') renderDatabase(); };
-        window.handleSearch = (val) => { searchTerm = val.trim().toUpperCase(); searchMatchIndex = 0; const jumpBtn = document.getElementById('search-jump-btn'); const matches = staff.filter(s => s.name.includes(searchTerm)); if (searchTerm && matches.length > 0) { jumpBtn.classList.remove('hidden'); document.getElementById('match-counter').innerText = `NEXT MATCH ${searchMatchIndex + 1}/${matches.length}`; } else jumpBtn.classList.add('hidden'); window.render(); };
+        window.handleSearch = (val) => { searchTerm = val.trim().toUpperCase(); searchMatchIndex = 0; const jumpBtn = document.getElementById('search-jump-btn'); const matches = staff.filter(s => s.name.includes(searchTerm)).sort((a,b) => a.checkIn.localeCompare(b.checkIn)); if (searchTerm && matches.length > 0) { jumpBtn.classList.remove('hidden'); document.getElementById('match-counter').innerText = `Match ${searchMatchIndex + 1} of ${matches.length}`; } else jumpBtn.classList.add('hidden'); window.render(); };
         window.clearSearch = () => { document.getElementById('staff-search').value = ""; window.handleSearch(""); };
-        window.jumpToSearchMatch = () => { const matches = staff.filter(s => s.name.includes(searchTerm)).sort((a,b) => a.checkIn.localeCompare(b.checkIn)); if (matches.length > 0) { const match = matches[searchMatchIndex % matches.length]; const d = new Date(match.checkIn + "T12:00:00"); d.setDate(d.getDate() - 3); viewStart = d; searchMatchIndex++; document.getElementById('match-counter').innerText = `NEXT MATCH ${(searchMatchIndex % matches.length) + 1}/${matches.length}`; window.render(); } };
+        window.jumpToSearchMatch = () => { const matches = staff.filter(s => s.name.includes(searchTerm)).sort((a,b) => a.checkIn.localeCompare(b.checkIn)); if (matches.length > 0) { const match = matches[searchMatchIndex % matches.length]; const d = new Date(match.checkIn + "T12:00:00"); d.setDate(d.getDate() - 3); viewStart = d; searchMatchIndex++; document.getElementById('match-counter').innerText = `Match ${(searchMatchIndex % matches.length) + 1} of ${matches.length}`; window.render(); } };
         window.syncLabels = () => { const iIn = document.getElementById('check-in').value, iOut = document.getElementById('check-out').value; document.getElementById('ov-in').innerText = iIn ? to15MAR(new Date(iIn + "T12:00:00")) : "---"; document.getElementById('ov-out').innerText = iOut ? to15MAR(new Date(iOut + "T12:00:00")) : "---"; };
         window.calcRefund = () => { const isChecked = id => document.getElementById(id).checked, getVal = id => Number(document.getElementById(id).value) || 0; let h = isChecked('paid-deposit') ? DEPOSIT_VAL : 0; h += getVal('amt-agoda') + getVal('amt-hostelworld') + getVal('amt-booking'); let r = isChecked('ref-deposit') ? DEPOSIT_VAL : 0; if (isChecked('ref-agoda')) r += getVal('amt-agoda'); if (isChecked('ref-hostelworld')) r += getVal('amt-hostelworld'); if (isChecked('ref-booking')) r += getVal('amt-booking'); document.getElementById('display-held').innerText = `฿${h.toLocaleString()}`; document.getElementById('display-refund-due').innerText = `฿${(h - r).toLocaleString()}`; };
         window.prevPeriod = () => { viewStart.setDate(viewStart.getDate() - 7); window.render(); };
