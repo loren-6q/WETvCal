@@ -45,7 +45,6 @@
         .alert-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(2px); align-items: center; justify-content: center; z-index: 200; }
         .alert-modal-overlay.active { display: flex; }
 
-        /* Icon Font Centering Fix */
         .icon-font { font-family: 'Bungee', cursive; font-size: 18px; line-height: 1; transform: translateY(2px); }
         .icon-box { 
             width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -79,15 +78,21 @@
 
         /* Logo Styling Fix */
         .logo-box { width: 48px; height: 48px; position: relative; display: flex; align-items: center; justify-content: center; background: #2563eb; border-radius: 10px; }
-        .logo-v-back { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Bungee', cursive; font-size: 44px; color: rgba(255,255,255,0.2); z-index: 1; pointer-events: none; }
-        .logo-people-front { position: relative; z-index: 2; color: #fff; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+        .logo-v-back { 
+            position: absolute; font-family: 'Bungee', cursive; font-size: 48px; 
+            color: rgba(255,255,255,0.2); z-index: 1; pointer-events: none;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+        }
+        .logo-people-front { position: relative; z-index: 2; color: #fff; }
     </style>
 </head>
 <body class="p-1 lg:p-2">
 
     <div id="boot-loader" class="loading-overlay">
         <div class="spinner"></div>
-        <div class="mt-4 font-black text-slate-800 uppercase tracking-widest">Cloud Syncing...</div>
+        <div class="mt-4 font-black text-slate-800 uppercase tracking-widest text-center px-4">
+            <span id="sync-status">Cloud Syncing...</span>
+        </div>
     </div>
 
     <div class="max-w-[1950px] mx-auto">
@@ -118,17 +123,22 @@
                         </div>
                         <button onclick="window.nextPeriod()" class="p-1 hover:bg-white rounded"><i data-lucide="chevron-right" size="20"></i></button>
                     </div>
-                    <button onclick="window.goToday()" class="px-4 py-1.5 bg-white border border-slate-300 rounded font-black text-xs uppercase hover:bg-slate-50">Today</button>
+                    <button onclick="window.goToday()" class="px-4 py-1.5 bg-white border border-slate-300 rounded font-bold text-xs uppercase hover:bg-slate-50">Today</button>
                     <button onclick="window.openStaffModal()" class="px-5 py-1.5 bg-blue-600 text-white rounded shadow-lg font-black text-xs uppercase flex items-center gap-2 hover:bg-blue-700 transition-all active:scale-95">
                         <i data-lucide="plus" size="16"></i> Add Staff
                     </button>
                 </div>
                 
                 <div class="flex items-center gap-2">
-                    <div id="search-jump-btn" onclick="window.jumpToSearchMatch()" class="hidden bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg font-black text-xs uppercase cursor-pointer hover:bg-orange-200 animate-pulse">Jump to Stay?</div>
+                    <div id="search-jump-btn" onclick="window.jumpToSearchMatch()" class="hidden bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg font-black text-xs uppercase cursor-pointer hover:bg-orange-200">
+                        <span id="match-counter">Match?</span>
+                    </div>
                     <div class="relative group">
                         <i data-lucide="search" class="absolute left-3 top-2 text-slate-400" size="18"></i>
-                        <input type="text" id="staff-search" placeholder="FIND NAME..." oninput="window.handleSearch(this.value)" class="pl-10 pr-4 py-1.5 w-64 bg-slate-50 border border-slate-200 rounded-lg font-black text-sm uppercase outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="staff-search" placeholder="FIND NAME..." oninput="window.handleSearch(this.value)" class="pl-10 pr-10 py-1.5 w-64 bg-slate-50 border border-slate-200 rounded-lg font-black text-sm uppercase outline-none focus:ring-2 focus:ring-blue-500">
+                        <button onclick="window.clearSearch()" class="absolute right-3 top-2 text-slate-400 hover:text-slate-600">
+                            <i data-lucide="x" size="18"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -274,7 +284,7 @@
         import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
-        const appId = window.__app_id || 'vol-calendar-final-v4';
+        const appId = window.__app_id || 'vol-calendar-prod-v1'; 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -283,6 +293,7 @@
         let staff = [];
         let viewStart = new Date(); viewStart.setHours(12,0,0,0);
         let searchTerm = "";
+        let searchMatchIndex = 0;
         let sortKey = "checkIn";
         let sortAsc = false;
         const mNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -293,16 +304,22 @@
         const to15MAR = d => !d || isNaN(d.getTime()) ? "---" : `${d.getDate()}${mNames[d.getMonth()]}${d.getFullYear().toString().substr(-2)}`;
 
         const init = async () => {
-            if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) { await signInWithCustomToken(auth, window.__initial_auth_token); } else { await signInAnonymously(auth); }
+            const authProvider = window.__initial_auth_token ? signInWithCustomToken(auth, window.__initial_auth_token) : signInAnonymously(auth);
+            await authProvider;
+            
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'staff'), (snap) => {
                         staff = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                         document.getElementById('boot-loader').style.display = 'none';
                         window.render();
+                    }, (err) => {
+                        console.error("Cloud Error:", err);
+                        document.getElementById('sync-status').innerText = "Sync Error - Check Connection";
                     });
                 }
             });
+
             const cSel = document.getElementById('staff-country');
             countries.forEach(c => { const opt = document.createElement('option'); opt.value = c; opt.innerText = c; cSel.appendChild(opt); });
             document.getElementById('footer-icons').innerHTML = `<div class="legend-item">${ICONS.D} DEPOSIT</div><div class="legend-item">${ICONS.H} HW</div><div class="legend-item">${ICONS.B} BDC</div><div class="legend-item">${ICONS.A} AGODA</div>`;
@@ -349,7 +366,7 @@
                 header.appendChild(col);
             });
             const beds = []; staff.forEach(s => { const k = `${s.room}-${s.bed}`; if(!beds.includes(k)) beds.push(k); });
-            while (beds.length < 15) beds.push(`Z-TEMP-${beds.length}`);
+            while (beds.length < 20) beds.push(`Z-TEMP-${beds.length}`);
             beds.sort((a,b) => a.localeCompare(b, undefined, {numeric: true}));
             beds.forEach(bedKey => {
                 const row = document.createElement('div'); row.className = 'timeline-grid bed-row';
@@ -358,8 +375,8 @@
                 for(let i=0; i<daysToShow; i++) {
                     const cell = document.createElement('div'); cell.className = 'day-column';
                     cell.onclick = () => { 
-                        const parts = bedKey.split('-');
-                        window.quickAdd(isTemp ? "" : parts[0], isTemp ? "" : parts[1], days[i]); 
+                        const parts = isTemp ? ["", ""] : bedKey.split('-');
+                        window.quickAdd(parts[0], parts[1], days[i]); 
                     }; 
                     row.appendChild(cell);
                 }
@@ -371,7 +388,7 @@
                             const diffStart = Math.max(0, (start - viewStart) / (1000 * 60 * 60 * 24)), diffEnd = Math.min(daysToShow, (end - viewStart) / (1000 * 60 * 60 * 24));
                             const left = (diffStart / daysToShow) * 100, width = ((diffEnd - diffStart) / daysToShow) * 100;
                             const bar = document.createElement('div'); bar.className = `staff-bar status-${s.status}`; bar.style.left = `calc(var(--sidebar-w) + ${left}%)`; bar.style.width = `calc(${width}%)`;
-                            if (searchTerm && !s.name.includes(searchTerm)) bar.style.opacity = "0.1";
+                            if (searchTerm && !s.name.includes(searchTerm)) bar.style.opacity = "0.15";
                             const getAmt = p => Number(s.ledger[p]?.amt || 0);
                             const held = (s.ledger.deposit.paid ? DEPOSIT_VAL : 0) + getAmt('agoda') + getAmt('hostelworld') + getAmt('booking');
                             const ref = (s.ledger.deposit.ref ? DEPOSIT_VAL : 0) + (s.ledger.agoda.ref ? getAmt('agoda') : 0) + (s.ledger.hostelworld.ref ? getAmt('hostelworld') : 0) + (s.ledger.booking.ref ? getAmt('booking') : 0);
@@ -410,19 +427,27 @@
         
         window.handleSearch = (val) => { 
             searchTerm = val.trim().toUpperCase(); 
+            searchMatchIndex = 0;
             const jumpBtn = document.getElementById('search-jump-btn');
-            const match = staff.find(s => s.name.includes(searchTerm));
-            if (searchTerm && match) jumpBtn.classList.remove('hidden');
-            else jumpBtn.classList.add('hidden');
+            const matches = staff.filter(s => s.name.includes(searchTerm));
+            if (searchTerm && matches.length > 0) {
+                jumpBtn.classList.remove('hidden');
+                document.getElementById('match-counter').innerText = `NEXT MATCH ${searchMatchIndex + 1}/${matches.length}`;
+            } else jumpBtn.classList.add('hidden');
             window.render(); 
         };
 
+        window.clearSearch = () => { document.getElementById('staff-search').value = ""; window.handleSearch(""); };
+
         window.jumpToSearchMatch = () => {
-            const match = staff.find(s => s.name.includes(searchTerm));
-            if (match) {
+            const matches = staff.filter(s => s.name.includes(searchTerm)).sort((a,b) => a.checkIn.localeCompare(b.checkIn));
+            if (matches.length > 0) {
+                const match = matches[searchMatchIndex % matches.length];
                 const d = new Date(match.checkIn + "T12:00:00");
-                d.setDate(d.getDate() - 3); // Padding
+                d.setDate(d.getDate() - 3); 
                 viewStart = d;
+                searchMatchIndex++;
+                document.getElementById('match-counter').innerText = `NEXT MATCH ${(searchMatchIndex % matches.length) + 1}/${matches.length}`;
                 window.render();
             }
         };
@@ -435,7 +460,7 @@
         window.jumpToDate = (val) => { if(!val) return; viewStart = new Date(val + "T12:00:00"); document.getElementById('jump-date').value = ""; window.render(); };
         window.openStaffModal = () => { const modal = document.getElementById('staff-modal'), form = document.getElementById('staff-form'); if (form) form.reset(); document.getElementById('staff-id').value = ""; document.getElementById('modal-title').innerText = "Add Volunteer"; document.getElementById('delete-btn').style.display = 'none'; modal.style.display = 'flex'; window.calcRefund(); window.syncLabels(); };
         window.closeStaffModal = () => { document.getElementById('staff-modal').style.display = 'none'; };
-        window.quickAdd = (room, bed, date) => { window.openStaffModal(); document.getElementById('room-name').value = room; document.getElementById('bed-number').value = bed; const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0'); document.getElementById('check-in').value = `${y}-${m}-${d}`; const out = new Date(date); out.setDate(date.getDate() + 14); const oy = out.getFullYear(), om = String(out.getMonth() + 1).padStart(2, '0'), od = String(out.getDate()).padStart(2, '0'); document.getElementById('check-out').value = `${oy}-${om}-${od}`; window.syncLabels(); };
+        window.quickAdd = (room, bed, date) => { window.openStaffModal(); document.getElementById('room-name').value = room || ""; document.getElementById('bed-number').value = bed || ""; const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0'); document.getElementById('check-in').value = `${y}-${m}-${d}`; const out = new Date(date); out.setDate(date.getDate() + 14); const oy = out.getFullYear(), om = String(out.getMonth() + 1).padStart(2, '0'), od = String(out.getDate()).padStart(2, '0'); document.getElementById('check-out').value = `${oy}-${om}-${od}`; window.syncLabels(); };
 
         document.getElementById('staff-form').onsubmit = async (e) => {
             e.preventDefault(); const cin = document.getElementById('check-in').value, cout = document.getElementById('check-out').value;
