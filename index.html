@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vol Calendar | Multi-Device Sync</title>
+    
+    <!-- Favicon: Thick Bungee-style V -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%232563eb%22/><text x=%2250%22 y=%2275%22 font-family=%22Arial Black, sans-serif%22 font-size=%2280%22 fill=%22white%22 text-anchor=%22middle%22>V</text></svg>">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -52,7 +56,7 @@
         }
         .icon-paid { background: #ef4444 !important; color: white !important; } 
         .icon-ref { background: #22c55e !important; color: white !important; }  
-        .icon-none { background: rgba(0,0,0,0.05) !important; color: rgba(255,255,255,0.2) !important; border-color: rgba(0,0,0,0.05) !important; opacity: 0.3; }
+        .icon-none { background: rgba(255,255,255,0.05) !important; color: rgba(255,255,255,0.2) !important; border-color: rgba(0,0,0,0.05) !important; opacity: 0.3; }
 
         .legend-item { display: flex; align-items: center; gap: 4px; font-size: 1rem; font-weight: 900; color: #475569; text-transform: uppercase; }
         .bar-sticky-content { position: sticky; left: 0; display: flex; align-items: center; padding: 0 8px; width: fit-content; max-width: 100vw; white-space: nowrap; }
@@ -76,14 +80,13 @@
         .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Logo Styling Fix */
-        .logo-box { width: 48px; height: 48px; position: relative; display: flex; align-items: center; justify-content: center; background: #2563eb; border-radius: 10px; }
+        /* Logo Styling */
+        .logo-box { width: 48px; height: 48px; position: relative; display: flex; align-items: center; justify-content: center; background: #2563eb; border-radius: 10px; overflow: hidden; }
         .logo-v-back { 
-            position: absolute; font-family: 'Bungee', cursive; font-size: 48px; 
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Bungee', cursive; font-size: 48px; 
             color: rgba(255,255,255,0.2); z-index: 1; pointer-events: none;
-            top: 50%; left: 50%; transform: translate(-50%, -50%);
         }
-        .logo-people-front { position: relative; z-index: 2; color: #fff; }
+        .logo-people-front { position: relative; z-index: 2; color: #fff; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
     </style>
 </head>
 <body class="p-1 lg:p-2">
@@ -91,7 +94,7 @@
     <div id="boot-loader" class="loading-overlay">
         <div class="spinner"></div>
         <div class="mt-4 font-black text-slate-800 uppercase tracking-widest text-center px-4">
-            <span id="sync-status">Cloud Syncing...</span>
+            <span id="sync-status">Initializing Vol Calendar...</span>
         </div>
     </div>
 
@@ -284,7 +287,7 @@
         import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
-        const appId = window.__app_id || 'vol-calendar-prod-v1'; 
+        const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'vol-calendar-wet-v1';
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -304,27 +307,21 @@
         const to15MAR = d => !d || isNaN(d.getTime()) ? "---" : `${d.getDate()}${mNames[d.getMonth()]}${d.getFullYear().toString().substr(-2)}`;
 
         const init = async () => {
-            const authProvider = window.__initial_auth_token ? signInWithCustomToken(auth, window.__initial_auth_token) : signInAnonymously(auth);
-            await authProvider;
-            
+            if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) { await signInWithCustomToken(auth, window.__initial_auth_token); } else { await signInAnonymously(auth); }
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'staff'), (snap) => {
                         staff = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                         document.getElementById('boot-loader').style.display = 'none';
                         window.render();
-                    }, (err) => {
-                        console.error("Cloud Error:", err);
-                        document.getElementById('sync-status').innerText = "Sync Error - Check Connection";
-                    });
+                    }, (err) => console.error("Snapshot error:", err));
                 }
             });
-
             const cSel = document.getElementById('staff-country');
             countries.forEach(c => { const opt = document.createElement('option'); opt.value = c; opt.innerText = c; cSel.appendChild(opt); });
             document.getElementById('footer-icons').innerHTML = `<div class="legend-item">${ICONS.D} DEPOSIT</div><div class="legend-item">${ICONS.H} HW</div><div class="legend-item">${ICONS.B} BDC</div><div class="legend-item">${ICONS.A} AGODA</div>`;
             document.getElementById('modal-icon-d').innerHTML = `${ICONS.D} DEPOSIT`;
-            document.getElementById('modal-icon-h').innerHTML = `${ICONS.H} HW`;
+            document.getElementById('modal-icon-h').innerHTML = `${ICONS.H} HOSTELWORLD`;
             document.getElementById('modal-icon-b').innerHTML = `${ICONS.B} BDC`;
             document.getElementById('modal-icon-a').innerHTML = `${ICONS.A} AGODA`;
             window.addEventListener('resize', window.render);
@@ -366,7 +363,7 @@
                 header.appendChild(col);
             });
             const beds = []; staff.forEach(s => { const k = `${s.room}-${s.bed}`; if(!beds.includes(k)) beds.push(k); });
-            while (beds.length < 20) beds.push(`Z-TEMP-${beds.length}`);
+            while (beds.length < 15) beds.push(`Z-TEMP-${beds.length}`);
             beds.sort((a,b) => a.localeCompare(b, undefined, {numeric: true}));
             beds.forEach(bedKey => {
                 const row = document.createElement('div'); row.className = 'timeline-grid bed-row';
@@ -424,34 +421,9 @@
 
         window.sortDatabase = (key) => { if(sortKey === key) sortAsc = !sortAsc; else { sortKey = key; sortAsc = true; } renderDatabase(); };
         window.switchTab = (t) => { document.getElementById('calendar-view').style.display = t === 'calendar' ? 'block' : 'none'; document.getElementById('database-view').style.display = t === 'database' ? 'block' : 'none'; document.getElementById('tab-cal').classList.toggle('active', t === 'calendar'); document.getElementById('tab-db').classList.toggle('active', t === 'database'); if (t === 'database') renderDatabase(); };
-        
-        window.handleSearch = (val) => { 
-            searchTerm = val.trim().toUpperCase(); 
-            searchMatchIndex = 0;
-            const jumpBtn = document.getElementById('search-jump-btn');
-            const matches = staff.filter(s => s.name.includes(searchTerm));
-            if (searchTerm && matches.length > 0) {
-                jumpBtn.classList.remove('hidden');
-                document.getElementById('match-counter').innerText = `NEXT MATCH ${searchMatchIndex + 1}/${matches.length}`;
-            } else jumpBtn.classList.add('hidden');
-            window.render(); 
-        };
-
+        window.handleSearch = (val) => { searchTerm = val.trim().toUpperCase(); searchMatchIndex = 0; const jumpBtn = document.getElementById('search-jump-btn'); const matches = staff.filter(s => s.name.includes(searchTerm)); if (searchTerm && matches.length > 0) { jumpBtn.classList.remove('hidden'); document.getElementById('match-counter').innerText = `NEXT MATCH ${searchMatchIndex + 1}/${matches.length}`; } else jumpBtn.classList.add('hidden'); window.render(); };
         window.clearSearch = () => { document.getElementById('staff-search').value = ""; window.handleSearch(""); };
-
-        window.jumpToSearchMatch = () => {
-            const matches = staff.filter(s => s.name.includes(searchTerm)).sort((a,b) => a.checkIn.localeCompare(b.checkIn));
-            if (matches.length > 0) {
-                const match = matches[searchMatchIndex % matches.length];
-                const d = new Date(match.checkIn + "T12:00:00");
-                d.setDate(d.getDate() - 3); 
-                viewStart = d;
-                searchMatchIndex++;
-                document.getElementById('match-counter').innerText = `NEXT MATCH ${(searchMatchIndex % matches.length) + 1}/${matches.length}`;
-                window.render();
-            }
-        };
-
+        window.jumpToSearchMatch = () => { const matches = staff.filter(s => s.name.includes(searchTerm)).sort((a,b) => a.checkIn.localeCompare(b.checkIn)); if (matches.length > 0) { const match = matches[searchMatchIndex % matches.length]; const d = new Date(match.checkIn + "T12:00:00"); d.setDate(d.getDate() - 3); viewStart = d; searchMatchIndex++; document.getElementById('match-counter').innerText = `NEXT MATCH ${(searchMatchIndex % matches.length) + 1}/${matches.length}`; window.render(); } };
         window.syncLabels = () => { const iIn = document.getElementById('check-in').value, iOut = document.getElementById('check-out').value; document.getElementById('ov-in').innerText = iIn ? to15MAR(new Date(iIn + "T12:00:00")) : "---"; document.getElementById('ov-out').innerText = iOut ? to15MAR(new Date(iOut + "T12:00:00")) : "---"; };
         window.calcRefund = () => { const isChecked = id => document.getElementById(id).checked, getVal = id => Number(document.getElementById(id).value) || 0; let h = isChecked('paid-deposit') ? DEPOSIT_VAL : 0; h += getVal('amt-agoda') + getVal('amt-hostelworld') + getVal('amt-booking'); let r = isChecked('ref-deposit') ? DEPOSIT_VAL : 0; if (isChecked('ref-agoda')) r += getVal('amt-agoda'); if (isChecked('ref-hostelworld')) r += getVal('amt-hostelworld'); if (isChecked('ref-booking')) r += getVal('amt-booking'); document.getElementById('display-held').innerText = `฿${h.toLocaleString()}`; document.getElementById('display-refund-due').innerText = `฿${(h - r).toLocaleString()}`; };
         window.prevPeriod = () => { viewStart.setDate(viewStart.getDate() - 7); window.render(); };
