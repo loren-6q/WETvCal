@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vol Calendar | Multi-Device Sync</title>
+    <title>WET Vol Calendar</title>
     
     <!-- Favicon: Thick Bungee-style V -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%232563eb%22/><text x=%2250%22 y=%2275%22 font-family=%22Arial Black, sans-serif%22 font-size=%2280%22 fill=%22white%22 text-anchor=%22middle%22>V</text></svg>">
@@ -366,7 +366,7 @@
 
             const cSel = document.getElementById('staff-country');
             countries.forEach(c => { const opt = document.createElement('option'); opt.value = c; opt.innerText = c; cSel.appendChild(opt); });
-            document.getElementById('footer-icons').innerHTML = `<div class="legend-item">${ICONS.D} DEPOSIT</div><div class="legend-item">${ICONS.H} HW</div><div class="legend-item">${ICONS.B} BDC</div><div class="legend-item">${ICONS.A} AGODA</div>`;
+            document.getElementById('footer-icons').innerHTML = `<div class="legend-item">${ICONS.D} DEPOSIT</div><div class="legend-item">${ICONS.H} HOSTELWORLD</div><div class="legend-item">${ICONS.B} BDC</div><div class="legend-item">${ICONS.A} AGODA</div>`;
             document.getElementById('modal-icon-d').innerHTML = `${ICONS.D} DEPOSIT`;
             document.getElementById('modal-icon-h').innerHTML = `${ICONS.H} HOSTELWORLD`;
             document.getElementById('modal-icon-b').innerHTML = `${ICONS.B} BDC`;
@@ -436,8 +436,9 @@
                 }
             });
 
+            // Sorting logic: Rooms first, then NONE rows at the bottom
             timelineBeds.sort((a,b) => {
-                if (a.isUnassigned !== b.isUnassigned) return a.isUnassigned ? -1 : 1;
+                if (a.isUnassigned !== b.isUnassigned) return a.isUnassigned ? 1 : -1;
                 return a.label.localeCompare(b.label, undefined, {numeric: true});
             });
 
@@ -496,7 +497,7 @@
                 return nameMatch && statusMatch;
             }).sort((a, b) => {
                 let vA = a[sortKey], vB = b[sortKey];
-                if (sortKey === 'bed') { vA = `${a.room}-${a.bed}`; vB = `${b.room}-${b.bed}`; }
+                if (sortKey === 'bed') { vA = `${a.room || ''}-${a.bed || ''}`; vB = `${b.room || ''}-${b.bed || ''}`; }
                 return sortAsc ? (vA > vB ? 1 : -1) : (vA < vB ? 1 : -1);
             });
             filtered.forEach(s => {
