@@ -1,3 +1,15 @@
+<!-- 
+  VOL CALENDAR - PRODUCTION VERSION
+  
+  HOW TO GO LIVE (Multi-Device Sync):
+  1. Go to console.firebase.google.com and create a free project named "VolCalendar".
+  2. In Firebase: Build > Authentication > Sign-in Method > Enable "Anonymous".
+  3. In Firebase: Build > Firestore Database > Create Database > "Start in Test Mode".
+  4. Project Overview > Web Icon (</>) > Register App.
+  5. Copy the 'firebaseConfig' object and paste it into the 'personalConfig' constant below.
+  6. Deploy this file to your GitHub Pages.
+-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -42,7 +54,9 @@
 
         .status-future { background-color: #2563eb; } 
         .status-here { background-color: #059669; }   
-        .status-left { background-color: #475569; }   
+        .status-left { background-color: #475569; }
+        .status-cancelled { background-color: #94a3b8; }
+        .status-noshow { background-color: #000; }
         
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 100; }
         .modal-overlay.active { display: flex; }
@@ -81,14 +95,16 @@
         .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Centered Logo: People over Ghost V */
+        /* Logo Layering: Bright People over Ghost V */
         .logo-box { width: 48px; height: 48px; position: relative; display: flex; align-items: center; justify-content: center; background: #2563eb; border-radius: 10px; overflow: hidden; }
         .logo-v-back { 
             position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Bungee', cursive; font-size: 52px; 
             color: rgba(255,255,255,0.18); z-index: 1; pointer-events: none;
-            top: 50%; left: 50%; transform: translate(-50%; -48%);
+            top: 50%; left: 50%; transform: translate(-50%, -48%);
         }
         .logo-people-front { position: relative; z-index: 2; color: #fff; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
+
+        .unassigned-header { background: #fef3c7 !important; color: #92400e !important; font-weight: 900; }
     </style>
 </head>
 <body class="p-1 lg:p-2">
@@ -138,12 +154,23 @@
                     <div id="search-jump-btn" onclick="window.jumpToSearchMatch()" class="hidden bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg font-black text-xs uppercase cursor-pointer hover:bg-orange-200">
                         <span id="match-counter">Match?</span>
                     </div>
-                    <div class="relative group">
-                        <i data-lucide="search" class="absolute left-3 top-2 text-slate-400" size="18"></i>
-                        <input type="text" id="staff-search" placeholder="FIND NAME..." oninput="window.handleSearch(this.value)" class="pl-10 pr-10 py-1.5 w-64 bg-slate-50 border border-slate-200 rounded-lg font-black text-sm uppercase outline-none focus:ring-2 focus:ring-blue-500">
-                        <button onclick="window.clearSearch()" class="absolute right-3 top-2 text-slate-400 hover:text-slate-600">
-                            <i data-lucide="x" size="18"></i>
-                        </button>
+                    <div class="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 gap-1">
+                        <select id="status-filter" onchange="window.handleSearch(document.getElementById('staff-search').value)" class="!bg-transparent !border-none text-xs font-black uppercase text-slate-500 cursor-pointer outline-none">
+                            <option value="ALL">ALL STATUS</option>
+                            <option value="future">FUTURE</option>
+                            <option value="here">HERE</option>
+                            <option value="left">LEFT</option>
+                            <option value="cancelled">CANCELLED</option>
+                            <option value="noshow">NO-SHOW</option>
+                        </select>
+                        <div class="h-4 w-px bg-slate-300 mx-1"></div>
+                        <div class="relative group">
+                            <i data-lucide="search" class="absolute left-2 top-1.5 text-slate-400" size="14"></i>
+                            <input type="text" id="staff-search" placeholder="FIND NAME..." oninput="window.handleSearch(this.value)" class="pl-7 pr-7 py-1 w-40 bg-white border border-slate-200 rounded-md font-black text-xs uppercase outline-none focus:ring-2 focus:ring-blue-500">
+                            <button onclick="window.clearSearch()" class="absolute right-2 top-1.5 text-slate-400 hover:text-slate-600">
+                                <i data-lucide="x" size="14"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -164,14 +191,14 @@
             </div>
 
             <!-- Footer Legend -->
-            <footer class="mt-2 bg-white p-3 rounded-lg border border-slate-200 flex flex-row flex-wrap items-center justify-center gap-x-8 gap-y-3">
+            <footer class="mt-2 bg-white p-3 rounded-lg border border-slate-200 flex flex-row flex-wrap items-center justify-center gap-x-8 gap-y-3 text-center">
                 <div class="flex items-center gap-4 border-r-0 lg:border-r pr-0 lg:pr-8">
                     <div class="legend-item"><span class="w-4 h-4 rounded-full bg-blue-600"></span> FUTURE</div>
                     <div class="legend-item"><span class="w-4 h-4 rounded-full bg-green-600"></span> HERE</div>
                     <div class="legend-item"><span class="w-4 h-4 rounded-full bg-slate-500"></span> LEFT</div>
                 </div>
                 <div id="footer-icons" class="flex flex-wrap items-center justify-center gap-4"></div>
-                <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest lg:border-l lg:pl-8 w-full lg:w-auto text-center">
+                <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest lg:border-l lg:pl-8 w-full lg:w-auto">
                     Red = Held | Green = Refunded
                 </div>
             </footer>
@@ -216,11 +243,11 @@
                 <div class="grid grid-cols-3 gap-3">
                     <div class="flex flex-col">
                         <label class="field-label">Room</label>
-                        <input type="text" id="room-name" required class="bg-slate-50 uppercase text-center">
+                        <input type="text" id="room-name" class="bg-slate-50 uppercase text-center" placeholder="--">
                     </div>
                     <div class="flex flex-col">
                         <label class="field-label">Bed #</label>
-                        <input type="number" id="bed-number" required class="bg-slate-50 text-center">
+                        <input type="number" id="bed-number" class="bg-slate-50 text-center" placeholder="--">
                     </div>
                     <div class="flex flex-col">
                         <label class="field-label">Status</label>
@@ -228,12 +255,25 @@
                             <option value="future">FUTURE</option>
                             <option value="here">HERE</option>
                             <option value="left">LEFT</option>
+                            <option value="cancelled">CANCELLED</option>
+                            <option value="noshow">NO-SHOW</option>
                         </select>
                     </div>
                 </div>
-                <div class="flex flex-col">
-                    <label class="field-label">Contact Info</label>
-                    <input type="text" id="staff-contact" placeholder="Email, Phone, WhatsApp..." class="bg-slate-50">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="flex flex-col">
+                        <label class="field-label">Contact Info</label>
+                        <input type="text" id="staff-contact" placeholder="Email, WhatsApp..." class="bg-slate-50">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="field-label">Special Job</label>
+                        <select id="staff-job" class="bg-slate-50 font-bold">
+                            <option value="none">NONE</option>
+                            <option value="art">ART</option>
+                            <option value="socials">SOCIALS</option>
+                            <option value="bar">BAR</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div class="flex flex-col">
@@ -288,25 +328,13 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- PRODUCTION CONFIG ---
-        // To make this work live, replace the empty object below with your firebaseConfig from Firebase Console.
-        const personalConfig = {
-  apiKey: "AIzaSyDd_i6as2LtvNWE1I44HFCU0LyJ4iO7KKQ",
-  authDomain: "volcalendar1.firebaseapp.com",
-  projectId: "volcalendar1",
-  storageBucket: "volcalendar1.firebasestorage.app",
-  messagingSenderId: "1081934202587",
-  appId: "1:1081934202587:web:28b226efb37216a2442efe"}; 
-        // -------------------------
-
-        const envConfig = JSON.parse(window.__firebase_config || '{}');
-        const finalConfig = personalConfig.apiKey ? personalConfig : envConfig;
-        const appId = window.__app_id || 'vol-calendar-wet-v1'; 
-
-        const app = initializeApp(finalConfig);
+        const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
+        const appId = window.__app_id || 'vol-calendar-wet-v1';
+        const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // State
         const DEPOSIT_VAL = 3000;
         let staff = [];
         let viewStart = new Date(); viewStart.setHours(12,0,0,0);
@@ -322,8 +350,10 @@
         const to15MAR = d => !d || isNaN(d.getTime()) ? "---" : `${d.getDate()}${mNames[d.getMonth()]}${d.getFullYear().toString().substr(-2)}`;
 
         const init = async () => {
-            const token = typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : null;
-            if (token) { await signInWithCustomToken(auth, token); } else { await signInAnonymously(auth); }
+            try {
+                const token = typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : null;
+                if (token) await signInWithCustomToken(auth, token); else await signInAnonymously(auth);
+            } catch(e) { await signInAnonymously(auth); }
 
             onAuthStateChanged(auth, (user) => {
                 if (user) {
@@ -331,7 +361,7 @@
                         staff = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                         document.getElementById('boot-loader').style.display = 'none';
                         window.render();
-                    }, (err) => console.error("Firebase Sync Error:", err));
+                    }, (err) => console.error("Snapshot error:", err));
                 }
             });
 
@@ -380,66 +410,114 @@
                 col.innerHTML = `<div class="text-[12px] font-black text-slate-500 uppercase leading-none">${d.toLocaleDateString('en-US', {weekday:'short'})}</div><div class="text-[18px] font-black ${isToday ? 'text-blue-600' : 'text-slate-800'}">${d.getDate()}</div>`;
                 header.appendChild(col);
             });
-            const beds = []; staff.forEach(s => { const k = `${s.room}-${s.bed}`; if(!beds.includes(k)) beds.push(k); });
-            while (beds.length < 15) beds.push(`Z-TEMP-${beds.length}`);
-            beds.sort((a,b) => a.localeCompare(b, undefined, {numeric: true}));
-            beds.forEach(bedKey => {
+
+            const activeStaff = staff.filter(s => s.status !== 'cancelled' && s.status !== 'noshow');
+            const bedGroups = {};
+            activeStaff.forEach(s => {
+                const k = (s.room && s.bed) ? `${s.room}-${s.bed}` : 'NONE';
+                if(!bedGroups[k]) bedGroups[k] = [];
+                bedGroups[k].push(s);
+            });
+
+            const timelineBeds = [];
+            Object.keys(bedGroups).forEach(key => {
+                if (key === 'NONE') {
+                    const rows = [];
+                    bedGroups[key].forEach(s => {
+                        let placed = false;
+                        for (let r of rows) {
+                            const conflict = r.some(existing => s.checkIn < existing.checkOut && existing.checkIn < s.checkOut);
+                            if (!conflict) { r.push(s); placed = true; break; }
+                        }
+                        if (!placed) rows.push([s]);
+                    });
+                    rows.forEach((r, idx) => timelineBeds.push({ label: `NONE${idx > 0 ? ' '+(idx+1) : ''}`, staff: r, isUnassigned: true }));
+                } else {
+                    timelineBeds.push({ label: key, staff: bedGroups[key], isUnassigned: false });
+                }
+            });
+
+            timelineBeds.sort((a,b) => {
+                if (a.isUnassigned !== b.isUnassigned) return a.isUnassigned ? -1 : 1;
+                return a.label.localeCompare(b.label, undefined, {numeric: true});
+            });
+
+            while (timelineBeds.length < 15) { timelineBeds.push({ label: '—', staff: [], isTemp: true }); }
+
+            timelineBeds.forEach(bedObj => {
                 const row = document.createElement('div'); row.className = 'timeline-grid bed-row';
-                const isTemp = bedKey.startsWith('Z-TEMP-');
-                row.innerHTML = `<div class="p-1 border-r border-slate-300 bg-slate-50 text-[16px] font-black text-slate-500 flex items-center justify-center uppercase tracking-tighter">${isTemp ? '—' : bedKey}</div>`;
+                row.innerHTML = `<div class="p-1 border-r border-slate-300 bg-slate-50 text-[14px] font-black text-slate-500 flex items-center justify-center uppercase tracking-tighter ${bedObj.isUnassigned ? 'unassigned-header' : ''}">${bedObj.label}</div>`;
+                
                 for(let i=0; i<daysToShow; i++) {
                     const cell = document.createElement('div'); cell.className = 'day-column';
                     cell.onclick = () => { 
-                        const parts = isTemp ? ["", ""] : bedKey.split('-');
-                        window.quickAdd(parts[0], parts[1], days[i]); 
+                        const parts = bedObj.label.startsWith('NONE') ? ["", ""] : bedObj.label.split('-');
+                        window.quickAdd(bedObj.isTemp || bedObj.isUnassigned ? "" : parts[0], bedObj.isTemp || bedObj.isUnassigned ? "" : parts[1], days[i]); 
                     }; 
                     row.appendChild(cell);
                 }
-                if (!isTemp) {
-                    const [r, b] = bedKey.split('-');
-                    staff.filter(s => s.room === r && s.bed === b).forEach(s => {
-                        const start = new Date(s.checkIn + "T12:00:00"), end = new Date(s.checkOut + "T12:00:00"), viewEnd = new Date(days[daysToShow - 1]); viewEnd.setHours(23,59,59,999);
-                        if (start <= viewEnd && end >= viewStart) {
-                            const diffStart = Math.max(0, (start - viewStart) / (1000 * 60 * 60 * 24)), diffEnd = Math.min(daysToShow, (end - viewStart) / (1000 * 60 * 60 * 24));
-                            const left = (diffStart / daysToShow) * 100, width = ((diffEnd - diffStart) / daysToShow) * 100;
-                            const bar = document.createElement('div'); bar.className = `staff-bar status-${s.status}`; bar.style.left = `calc(var(--sidebar-w) + ${left}%)`; bar.style.width = `calc(${width}%)`;
-                            if (searchTerm && !s.name.includes(searchTerm)) bar.style.opacity = "0.15";
-                            const getAmt = p => Number(s.ledger[p]?.amt || 0);
-                            const held = (s.ledger.deposit.paid ? DEPOSIT_VAL : 0) + getAmt('agoda') + getAmt('hostelworld') + getAmt('booking');
-                            const ref = (s.ledger.deposit.ref ? DEPOSIT_VAL : 0) + (s.ledger.agoda.ref ? getAmt('agoda') : 0) + (s.ledger.hostelworld.ref ? getAmt('hostelworld') : 0) + (s.ledger.booking.ref ? getAmt('booking') : 0);
-                            const due = held - ref;
-                            const getBarIcon = (char, p, isDep = false) => {
-                                const data = s.ledger[p], hasValue = isDep ? data.paid : getAmt(p) > 0;
-                                const cls = !hasValue ? 'icon-none' : (data.ref ? 'icon-ref' : 'icon-paid');
-                                const bg = isDep ? "#eab308" : (p === 'hostelworld' ? "#f15a24" : (p === 'booking' ? "#003580" : "#555"));
-                                return `<div class="icon-box ${cls}" style="${hasValue ? 'background:'+bg : ''}"><span class="icon-font" style="color:white">${char}</span></div>`;
-                            };
-                            bar.innerHTML = `<div class="bar-sticky-content"><span class="mr-2 truncate">${s.name} | ${to15MAR(start).slice(0,-2)}-${to15MAR(end).slice(0,-2)}</span><div class="flex gap-1 items-center scale-90 shrink-0">${getBarIcon("$", 'deposit', true)}${getBarIcon("H", 'hostelworld')}${getBarIcon("B", 'booking')}${getBarIcon("A", 'agoda')}${due > 0 ? `<span class="bg-black/40 px-1.5 py-0.5 rounded text-[16px] font-black ml-1">฿${due}</span>` : ''}</div></div>`;
-                            bar.onclick = (e) => { e.stopPropagation(); window.editStaff(s.id); }; row.appendChild(bar);
-                        }
-                    });
-                }
+
+                bedObj.staff.forEach(s => {
+                    const start = new Date(s.checkIn + "T12:00:00"), end = new Date(s.checkOut + "T12:00:00"), viewEnd = new Date(days[daysToShow - 1]); viewEnd.setHours(23,59,59,999);
+                    if (start <= viewEnd && end >= viewStart) {
+                        const diffStart = Math.max(0, (start - viewStart) / (1000 * 60 * 60 * 24)), diffEnd = Math.min(daysToShow, (end - viewStart) / (1000 * 60 * 60 * 24));
+                        const left = (diffStart / daysToShow) * 100, width = ((diffEnd - diffStart) / daysToShow) * 100;
+                        const bar = document.createElement('div'); bar.className = `staff-bar status-${s.status}`; bar.style.left = `calc(var(--sidebar-w) + ${left}%)`; bar.style.width = `calc(${width}%)`;
+                        if (searchTerm && !s.name.includes(searchTerm)) bar.style.opacity = "0.15";
+                        
+                        const getAmt = p => Number(s.ledger[p]?.amt || 0);
+                        const held = (s.ledger.deposit.paid ? DEPOSIT_VAL : 0) + getAmt('agoda') + getAmt('hostelworld') + getAmt('booking');
+                        const ref = (s.ledger.deposit.ref ? DEPOSIT_VAL : 0) + (s.ledger.agoda.ref ? getAmt('agoda') : 0) + (s.ledger.hostelworld.ref ? getAmt('hostelworld') : 0) + (s.ledger.booking.ref ? getAmt('booking') : 0);
+                        const due = held - ref;
+                        
+                        const getBarIcon = (char, p, isDep = false) => {
+                            const data = s.ledger[p], hasValue = isDep ? data.paid : getAmt(p) > 0;
+                            const cls = !hasValue ? 'icon-none' : (data.ref ? 'icon-ref' : 'icon-paid');
+                            const bg = isDep ? "#eab308" : (p === 'hostelworld' ? "#f15a24" : (p === 'booking' ? "#003580" : "#555"));
+                            return `<div class="icon-box ${cls}" style="${hasValue ? 'background:'+bg : ''}"><span class="icon-font" style="color:white">${char}</span></div>`;
+                        };
+
+                        const jobIcons = { art: 'palette', socials: 'megaphone', bar: 'beer' };
+                        const jobIconHtml = s.job && s.job !== 'none' ? `<i data-lucide="${jobIcons[s.job]}" size="14" class="mr-1 text-white/80"></i>` : '';
+
+                        bar.innerHTML = `<div class="bar-sticky-content">${jobIconHtml}<span class="mr-2 truncate">${s.name}</span><div class="flex gap-1 items-center scale-90 shrink-0">${getBarIcon("$", 'deposit', true)}${getBarIcon("H", 'hostelworld')}${getBarIcon("B", 'booking')}${getBarIcon("A", 'agoda')}${due > 0 ? `<span class="bg-black/40 px-1.5 py-0.5 rounded text-[16px] font-black ml-1">฿${due}</span>` : ''}</div></div>`;
+                        bar.onclick = (e) => { e.stopPropagation(); window.editStaff(s.id); }; row.appendChild(bar);
+                    }
+                });
                 body.appendChild(row);
             });
         };
 
         const renderDatabase = () => {
             const body = document.getElementById('database-body'); body.innerHTML = '';
-            const filtered = staff.filter(s => !searchTerm || s.name.includes(searchTerm)).sort((a, b) => {
+            const selStatus = document.getElementById('status-filter').value;
+            const filtered = staff.filter(s => {
+                const nameMatch = !searchTerm || s.name.includes(searchTerm);
+                const statusMatch = selStatus === 'ALL' || s.status === selStatus;
+                return nameMatch && statusMatch;
+            }).sort((a, b) => {
                 let vA = a[sortKey], vB = b[sortKey];
                 if (sortKey === 'bed') { vA = `${a.room}-${a.bed}`; vB = `${b.room}-${b.bed}`; }
                 return sortAsc ? (vA > vB ? 1 : -1) : (vA < vB ? 1 : -1);
             });
             filtered.forEach(s => {
                 const tr = document.createElement('tr'); tr.className = "border-b hover:bg-slate-50 cursor-pointer"; tr.onclick = () => window.editStaff(s.id);
-                tr.innerHTML = `<td class="p-3 border-r">${s.name}</td><td class="p-3 border-r">${s.country}</td><td class="p-3 border-r">${s.contact || '---'}</td><td class="p-3 border-r">${to15MAR(new Date(s.checkIn + "T12:00:00"))} - ${to15MAR(new Date(s.checkOut + "T12:00:00"))}</td><td class="p-3 border-r">${s.room}-${s.bed}</td><td class="p-3 uppercase"><span class="px-2 py-1 rounded text-[10px] text-white status-${s.status}">${s.status}</span></td>`;
+                const jobLabel = s.job && s.job !== 'none' ? `<span class="text-blue-500">[${s.job.toUpperCase()}]</span> ` : '';
+                tr.innerHTML = `<td class="p-3 border-r">${s.name}</td><td class="p-3 border-r">${s.country}</td><td class="p-3 border-r">${jobLabel}${s.contact || '---'}</td><td class="p-3 border-r">${to15MAR(new Date(s.checkIn + "T12:00:00"))} - ${to15MAR(new Date(s.checkOut + "T12:00:00"))}</td><td class="p-3 border-r">${s.room || '--'}-${s.bed || '--'}</td><td class="p-3 uppercase"><span class="px-2 py-1 rounded text-[10px] text-white status-${s.status}">${s.status}</span></td>`;
                 body.appendChild(tr);
             });
         };
 
         window.sortDatabase = (key) => { if(sortKey === key) sortAsc = !sortAsc; else { sortKey = key; sortAsc = true; } renderDatabase(); };
         window.switchTab = (t) => { document.getElementById('calendar-view').style.display = t === 'calendar' ? 'block' : 'none'; document.getElementById('database-view').style.display = t === 'database' ? 'block' : 'none'; document.getElementById('tab-cal').classList.toggle('active', t === 'calendar'); document.getElementById('tab-db').classList.toggle('active', t === 'database'); if (t === 'database') renderDatabase(); };
-        window.handleSearch = (val) => { searchTerm = val.trim().toUpperCase(); searchMatchIndex = 0; const jumpBtn = document.getElementById('search-jump-btn'); const matches = staff.filter(s => s.name.includes(searchTerm)).sort((a,b) => a.checkIn.localeCompare(b.checkIn)); if (searchTerm && matches.length > 0) { jumpBtn.classList.remove('hidden'); document.getElementById('match-counter').innerText = `Match ${searchMatchIndex + 1} of ${matches.length}`; } else jumpBtn.classList.add('hidden'); window.render(); };
+        window.handleSearch = (val) => { 
+            searchTerm = val.trim().toUpperCase(); 
+            searchMatchIndex = 0; 
+            const jumpBtn = document.getElementById('search-jump-btn'); 
+            const matches = staff.filter(s => s.name.includes(searchTerm)).sort((a,b) => a.checkIn.localeCompare(b.checkIn)); 
+            if (searchTerm && matches.length > 0) { jumpBtn.classList.remove('hidden'); document.getElementById('match-counter').innerText = `Match ${searchMatchIndex + 1} of ${matches.length}`; } else jumpBtn.classList.add('hidden'); 
+            window.render(); 
+        };
         window.clearSearch = () => { document.getElementById('staff-search').value = ""; window.handleSearch(""); };
         window.jumpToSearchMatch = () => { const matches = staff.filter(s => s.name.includes(searchTerm)).sort((a,b) => a.checkIn.localeCompare(b.checkIn)); if (matches.length > 0) { const match = matches[searchMatchIndex % matches.length]; const d = new Date(match.checkIn + "T12:00:00"); d.setDate(d.getDate() - 3); viewStart = d; searchMatchIndex++; document.getElementById('match-counter').innerText = `Match ${(searchMatchIndex % matches.length) + 1} of ${matches.length}`; window.render(); } };
         window.syncLabels = () => { const iIn = document.getElementById('check-in').value, iOut = document.getElementById('check-out').value; document.getElementById('ov-in').innerText = iIn ? to15MAR(new Date(iIn + "T12:00:00")) : "---"; document.getElementById('ov-out').innerText = iOut ? to15MAR(new Date(iOut + "T12:00:00")) : "---"; };
@@ -456,16 +534,14 @@
             e.preventDefault(); const cin = document.getElementById('check-in').value, cout = document.getElementById('check-out').value;
             if (cin >= cout) { window.showAlert("INVALID DATES:\nDeparture must be after arrival."); return; }
             const id = document.getElementById('staff-id').value || Math.random().toString(36).substr(2, 9);
-            const entry = { id, name: document.getElementById('staff-name').value.trim().toUpperCase(), status: document.getElementById('staff-status').value, room: document.getElementById('room-name').value.trim().toUpperCase(), bed: document.getElementById('bed-number').value, checkIn: cin, checkOut: cout, country: document.getElementById('staff-country').value, contact: document.getElementById('staff-contact').value, notes: document.getElementById('staff-notes').value, ledger: { deposit: { paid: document.getElementById('paid-deposit').checked, ref: document.getElementById('ref-deposit').checked }, agoda: { amt: document.getElementById('amt-agoda').value, ref: document.getElementById('ref-agoda').checked }, hostelworld: { amt: document.getElementById('amt-hostelworld').value, ref: document.getElementById('ref-hostelworld').checked }, booking: { amt: document.getElementById('amt-booking').value, ref: document.getElementById('ref-booking').checked } } };
-            const conflict = staff.find(s => s.id !== id && s.room === entry.room && s.bed === entry.bed && entry.checkIn < s.checkOut && s.checkIn < entry.checkOut);
-            if (conflict) { window.showAlert(`BED OCCUPIED ERROR:\n\n${conflict.name} is using Bed ${entry.room}-${entry.bed} until ${to15MAR(new Date(conflict.checkOut + "T12:00:00"))}.`); return; }
+            const entry = { id, name: document.getElementById('staff-name').value.trim().toUpperCase(), status: document.getElementById('staff-status').value, room: document.getElementById('room-name').value.trim().toUpperCase(), bed: document.getElementById('bed-number').value, checkIn: cin, checkOut: cout, country: document.getElementById('staff-country').value, contact: document.getElementById('staff-contact').value, job: document.getElementById('staff-job').value, notes: document.getElementById('staff-notes').value, ledger: { deposit: { paid: document.getElementById('paid-deposit').checked, ref: document.getElementById('ref-deposit').checked }, agoda: { amt: document.getElementById('amt-agoda').value, ref: document.getElementById('ref-agoda').checked }, hostelworld: { amt: document.getElementById('amt-hostelworld').value, ref: document.getElementById('ref-hostelworld').checked }, booking: { amt: document.getElementById('amt-booking').value, ref: document.getElementById('ref-booking').checked } } };
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'staff', id), entry);
             window.closeStaffModal();
         };
 
         window.editStaff = (id) => {
             const s = staff.find(x => x.id === id); if (!s) return;
-            document.getElementById('modal-title').innerText = "Edit Volunteer"; document.getElementById('staff-id').value = s.id; document.getElementById('staff-name').value = s.name; document.getElementById('staff-status').value = s.status; document.getElementById('room-name').value = s.room; document.getElementById('bed-number').value = s.bed; document.getElementById('check-in').value = s.checkIn; document.getElementById('check-out').value = s.checkOut; document.getElementById('staff-country').value = s.country; document.getElementById('staff-contact').value = s.contact || ""; document.getElementById('staff-notes').value = s.notes || ""; window.syncLabels();
+            document.getElementById('modal-title').innerText = "Edit Volunteer"; document.getElementById('staff-id').value = s.id; document.getElementById('staff-name').value = s.name; document.getElementById('staff-status').value = s.status; document.getElementById('room-name').value = s.room || ""; document.getElementById('bed-number').value = s.bed || ""; document.getElementById('check-in').value = s.checkIn; document.getElementById('check-out').value = s.checkOut; document.getElementById('staff-country').value = s.country; document.getElementById('staff-contact').value = s.contact || ""; document.getElementById('staff-job').value = s.job || "none"; document.getElementById('staff-notes').value = s.notes || ""; window.syncLabels();
             const L = s.ledger; document.getElementById('paid-deposit').checked = L.deposit.paid; document.getElementById('ref-deposit').checked = L.deposit.ref; document.getElementById('amt-agoda').value = L.agoda.amt || ""; document.getElementById('ref-agoda').checked = L.agoda.ref; document.getElementById('amt-hostelworld').value = L.hostelworld.amt || ""; document.getElementById('ref-hostelworld').checked = L.hostelworld.ref; document.getElementById('amt-booking').value = L.booking.amt || ""; document.getElementById('ref-booking').checked = L.booking.ref;
             window.calcRefund(); document.getElementById('delete-btn').style.display = 'block'; document.getElementById('staff-modal').style.display = 'flex';
         };
