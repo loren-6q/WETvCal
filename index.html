@@ -28,9 +28,12 @@
         @media (min-width: 1150px) { :root { --days: 35; } --sidebar-w: 105px; }
 
         .timeline-grid { display: grid; grid-template-columns: var(--sidebar-w) repeat(var(--days), 1fr); }
-        .day-column { border-right: 1px solid #e2e8f0; height: 100%; position: relative; cursor: cell; min-width: 25px; }
-        .day-column:hover { filter: brightness(0.9) !important; }
-        .bed-row { height: 38px; border-bottom: 1px solid #cbd5e1; position: relative; }
+        .day-column { border-right: 1px solid #e2e8f0; height: 100%; position: relative; cursor: cell; min-width: 25px; transition: filter 0.1s; }
+        .bed-row { height: 38px; border-bottom: 1px solid #cbd5e1; position: relative; transition: filter 0.1s; }
+        
+        /* Crosshair Highlighting - Uses Brightness Filter to work over shaded columns */
+        .bed-row:hover { filter: brightness(0.94); }
+        .hover-col { filter: brightness(0.94); }
         
         /* DARKER Full Moon Shading Colors for Visibility */
         .day-fmp-dark { background-color: rgba(225, 29, 72, 0.5) !important; } /* Deep Rose/Red - Party Day */
@@ -386,6 +389,14 @@
         const ICONS = { D: makeIcon("$", "#eab308", "white"), H: makeIcon("H", "#f15a24"), B: makeIcon("B", "#003580"), A: makeIcon("A", "#888") };
         const to15MAR = d => !d || isNaN(d.getTime()) ? "---" : `${d.getDate()}${mNames[d.getMonth()]}${d.getFullYear().toString().substr(-2)}`;
 
+        // Strict Flat Date Math: Computes integer days between two dates, ignoring timezone drift
+        const getDayIndex = (dateStr) => {
+            const [y, m, d] = dateStr.split('-');
+            const target = Date.UTC(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+            const anchor = Date.UTC(viewStart.getFullYear(), viewStart.getMonth(), viewStart.getDate());
+            return Math.round((target - anchor) / 86400000);
+        };
+
         const init = async () => {
             try {
                 // If using a personal Firebase Config, do NOT attempt to use Canvas custom tokens. Go straight to Anonymous.
@@ -433,8 +444,8 @@
         const getFMPShade = (date) => {
             for (let fmpStr of fmpDates) {
                 const fmp = new Date(fmpStr + "T12:00:00");
-                const diff = (date - fmp) / (1000 * 60 * 60 * 24);
-                if (Math.abs(diff) < 0.1) return 'day-fmp-dark';
+                const diff = Math.round((date - fmp) / 86400000);
+                if (diff === 0) return 'day-fmp-dark';
                 if (diff >= -2 && diff <= 2) return 'day-fmp-medium';
                 if (diff >= -6 && diff <= 4) return 'day-fmp-light';
             }
@@ -445,7 +456,7 @@
             const header = document.getElementById('timeline-header'), body = document.getElementById('timeline-body'), monthLabels = document.getElementById('month-labels');
             header.innerHTML = monthLabels.innerHTML = body.innerHTML = '';
             const days = [];
-            for (let i = 0; i < daysToShow; i++) { const d = new Date(viewStart); d.setDate(viewStart.getDate() + i); days.push(d); }
+            for (let i = 0; i < daysToShow; i++) { const d = new Date(viewStart.getFullYear(), viewStart.getMonth(), viewStart.getDate() + i, 12, 0, 0); days.push(d); }
             
             let currentMonth = -1, currentSpan = 0;
             days.forEach((d, i) => {
@@ -471,7 +482,6 @@
             });
 
             const activeStaff = staff.filter(s => s.status !== 'cancelled' && s.status !== 'noshow');
-            const viewEnd = new Date(days[daysToShow - 1]); viewEnd.setHours(23,59,59,999);
             
             const bedGroups = {};
             
@@ -492,9 +502,7 @@
                 if (key === 'NONE') {
                     // Only process NONE staff who OVERLAP the current view!
                     const overlappingNone = bedGroups[key].filter(s => {
-                        const start = new Date(s.checkIn + "T12:00:00");
-                        const end = new Date(s.checkOut + "T12:00:00");
-                        return (start <= viewEnd && end >= viewStart);
+                        return (getDayIndex(s.checkIn) < daysToShow && getDayIndex(s.checkOut) > 0);
                     });
 
                     const rows = [];
@@ -511,9 +519,7 @@
                     const parts = key.split('-');
                     const isPermanent = parts[0] === '211' && parseInt(parts[1]) >= 1 && parseInt(parts[1]) <= 14;
                     const overlappingStaff = bedGroups[key].filter(s => {
-                        const start = new Date(s.checkIn + "T12:00:00");
-                        const end = new Date(s.checkOut + "T12:00:00");
-                        return (start <= viewEnd && end >= viewStart);
+                        return (getDayIndex(s.checkIn) < daysToShow && getDayIndex(s.checkOut) > 0);
                     });
                     
                     if (isPermanent || overlappingStaff.length > 0) {
@@ -523,7 +529,6 @@
             });
 
             // Fill with blank rows if short
-            let currentLength = timelineBeds.length;
             while (timelineBeds.length < 15) { timelineBeds.push({ label: '—', staff: [], isTemp: true, isUnassigned: false }); }
 
             // Sorting: Rooms first, Temp Fillers next, NONE rows at the bottom
@@ -547,19 +552,36 @@
                     const fmpClass = getFMPShade(days[i]);
                     const isToday = days[i].toDateString() === new Date().toDateString();
                     cell.className = `day-column ${fmpClass} ${isToday ? 'day-today' : ''} ${bedObj.isUnassigned ? 'bg-amber-50/50' : ''}`;
+                    
+                    // Hover crosshair logic
+                    cell.dataset.colIndex = i;
+                    cell.onmouseenter = () => { document.querySelectorAll(`[data-col-index="${i}"]`).forEach(el => el.classList.add('hover-col')); };
+                    cell.onmouseleave = () => { document.querySelectorAll(`[data-col-index="${i}"]`).forEach(el => el.classList.remove('hover-col')); };
+
                     cell.onclick = () => { 
-                        const parts = bedObj.label.startsWith('NONE') ? ["", ""] : bedObj.label.split('-');
-                        window.quickAdd(bedObj.isTemp || bedObj.isUnassigned ? "" : parts[0], bedObj.isTemp || bedObj.isUnassigned ? "" : parts[1], days[i]); 
+                        const parts = bedObj.label.startsWith('NONE') || bedObj.label === '—' ? ["", ""] : bedObj.label.split('-');
+                        window.quickAdd(parts[0], parts[1], days[i]); 
                     }; 
                     row.appendChild(cell);
                 }
 
                 bedObj.staff.forEach(s => {
-                    const start = new Date(s.checkIn + "T12:00:00"), end = new Date(s.checkOut + "T12:00:00");
-                    if (start <= viewEnd && end >= viewStart) {
-                        const diffStart = Math.max(0, (start - viewStart) / (1000 * 60 * 60 * 24)), diffEnd = Math.min(daysToShow, (end - viewStart) / (1000 * 60 * 60 * 24));
-                        const left = (diffStart / daysToShow) * 100, width = ((diffEnd - diffStart) / daysToShow) * 100;
-                        const bar = document.createElement('div'); bar.className = `staff-bar status-${s.status}`; bar.style.left = `calc(var(--sidebar-w) + ${left}%)`; bar.style.width = `calc(${width}%)`;
+                    const exactStart = getDayIndex(s.checkIn) + 0.5;
+                    const exactEnd = getDayIndex(s.checkOut) + 0.5;
+
+                    if (exactStart < daysToShow && exactEnd > 0) {
+                        const diffStart = Math.max(0, exactStart);
+                        const diffEnd = Math.min(daysToShow, exactEnd);
+                        
+                        // Strict CSS calc to avoid Sidebar-width percentage bugs
+                        const startFraction = diffStart / daysToShow;
+                        const widthFraction = (diffEnd - diffStart) / daysToShow;
+                        
+                        const bar = document.createElement('div'); 
+                        bar.className = `staff-bar status-${s.status}`; 
+                        bar.style.left = `calc(var(--sidebar-w) + (100% - var(--sidebar-w)) * ${startFraction})`;
+                        bar.style.width = `calc((100% - var(--sidebar-w)) * ${widthFraction})`;
+                        
                         if (searchTerm && !s.name.includes(searchTerm)) bar.style.opacity = "0.15";
                         
                         const getAmt = p => Number(s.ledger[p]?.amt || 0);
