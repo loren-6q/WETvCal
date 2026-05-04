@@ -141,9 +141,14 @@
                         <button onclick="window.nextPeriod()" class="p-1 hover:bg-white rounded"><i data-lucide="chevron-right" size="20"></i></button>
                     </div>
                     <button onclick="window.goToday()" class="px-4 py-1.5 bg-white border border-slate-300 rounded font-bold text-xs uppercase hover:bg-slate-50">Today</button>
-                    <button onclick="window.openStaffModal()" class="px-5 py-1.5 bg-blue-600 text-white rounded shadow-lg font-black text-xs uppercase flex items-center gap-2 hover:bg-blue-700 transition-all active:scale-95">
-                        <i data-lucide="plus" size="16"></i> Add Staff
-                    </button>
+                    <div class="flex gap-1 ml-1">
+                        <button onclick="window.openImportModal()" class="px-4 py-1.5 bg-indigo-600 text-white rounded shadow-lg font-black text-xs uppercase flex items-center gap-1.5 hover:bg-indigo-700 transition-all active:scale-95">
+                            <i data-lucide="clipboard-paste" size="16"></i> Import
+                        </button>
+                        <button onclick="window.openStaffModal()" class="px-5 py-1.5 bg-blue-600 text-white rounded shadow-lg font-black text-xs uppercase flex items-center gap-2 hover:bg-blue-700 transition-all active:scale-95">
+                            <i data-lucide="plus" size="16"></i> Add Staff
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="flex flex-wrap items-center gap-2 w-full xl:w-auto mt-1 xl:mt-0">
@@ -223,7 +228,7 @@
         </div>
     </div>
 
-    <!-- Modals -->
+    <!-- Add/Edit Modal -->
     <div id="staff-modal" class="modal-overlay p-2">
         <div class="bg-white w-full max-w-xl rounded-lg shadow-2xl overflow-hidden border-2 border-slate-800">
             <div class="bg-slate-900 p-3 text-white flex justify-between items-center">
@@ -342,6 +347,24 @@
                 <div class="flex gap-2 justify-center">
                     <button onclick="document.getElementById('split-modal').style.display='none'" class="px-6 py-2 bg-slate-200 rounded-lg font-black text-sm uppercase">Cancel</button>
                     <button onclick="window.confirmSplit()" class="px-10 py-2 bg-orange-600 text-white rounded-lg font-black text-sm uppercase">Split Stay</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Import Parse Modal -->
+    <div id="import-modal" class="alert-modal-overlay">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden border-2 border-slate-800 flex flex-col">
+            <div class="bg-slate-900 p-3 text-white font-bold uppercase flex justify-between items-center text-sm">
+                <span>Import Booking Text</span>
+                <button type="button" onclick="document.getElementById('import-modal').style.display='none'"><i data-lucide="x" size="18"></i></button>
+            </div>
+            <div class="p-4 flex flex-col gap-3">
+                <p class="text-sm font-bold text-slate-500 uppercase">Paste confirmation text from parser here:</p>
+                <textarea id="import-textarea" rows="6" class="w-full bg-slate-50 border border-slate-300 font-bold text-sm p-2 rounded outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g. fabi confirmed his stay!&#10;Arrive on May/05/2026 and leave on Jun/04/2026..."></textarea>
+                <div class="flex gap-2 justify-end mt-2">
+                    <button onclick="document.getElementById('import-modal').style.display='none'" class="px-6 py-2 bg-slate-200 rounded-lg font-black text-sm uppercase">Cancel</button>
+                    <button onclick="window.processImport()" class="px-8 py-2 bg-indigo-600 text-white rounded-lg font-black text-sm uppercase">Parse & Save</button>
                 </div>
             </div>
         </div>
@@ -482,6 +505,8 @@
             });
 
             const activeStaff = staff.filter(s => s.status !== 'cancelled' && s.status !== 'noshow');
+            const viewStartUTC = Date.UTC(viewStart.getFullYear(), viewStart.getMonth(), viewStart.getDate());
+            const viewEndUTC = viewStartUTC + daysToShow * 86400000;
             
             const bedGroups = {};
             
@@ -502,7 +527,11 @@
                 if (key === 'NONE') {
                     // Only process NONE staff who OVERLAP the current view!
                     const overlappingNone = bedGroups[key].filter(s => {
-                        return (getDayIndex(s.checkIn) < daysToShow && getDayIndex(s.checkOut) > 0);
+                        const [inY, inM, inD] = s.checkIn.split('-');
+                        const [outY, outM, outD] = s.checkOut.split('-');
+                        const startUTC = Date.UTC(inY, inM - 1, inD);
+                        const endUTC = Date.UTC(outY, outM - 1, outD);
+                        return (startUTC <= viewEndUTC && endUTC >= viewStartUTC);
                     });
 
                     const rows = [];
@@ -519,7 +548,11 @@
                     const parts = key.split('-');
                     const isPermanent = parts[0] === '211' && parseInt(parts[1]) >= 1 && parseInt(parts[1]) <= 14;
                     const overlappingStaff = bedGroups[key].filter(s => {
-                        return (getDayIndex(s.checkIn) < daysToShow && getDayIndex(s.checkOut) > 0);
+                        const [inY, inM, inD] = s.checkIn.split('-');
+                        const [outY, outM, outD] = s.checkOut.split('-');
+                        const startUTC = Date.UTC(inY, inM - 1, inD);
+                        const endUTC = Date.UTC(outY, outM - 1, outD);
+                        return (startUTC <= viewEndUTC && endUTC >= viewStartUTC);
                     });
                     
                     if (isPermanent || overlappingStaff.length > 0) {
@@ -529,6 +562,7 @@
             });
 
             // Fill with blank rows if short
+            let currentLength = timelineBeds.length;
             while (timelineBeds.length < 15) { timelineBeds.push({ label: '—', staff: [], isTemp: true, isUnassigned: false }); }
 
             // Sorting: Rooms first, Temp Fillers next, NONE rows at the bottom
@@ -560,7 +594,7 @@
 
                     cell.onclick = () => { 
                         const parts = bedObj.label.startsWith('NONE') || bedObj.label === '—' ? ["", ""] : bedObj.label.split('-');
-                        window.quickAdd(parts[0], parts[1], days[i]); 
+                        window.quickAdd(bedObj.isTemp || bedObj.isUnassigned ? "" : parts[0], bedObj.isTemp || bedObj.isUnassigned ? "" : parts[1], days[i]); 
                     }; 
                     row.appendChild(cell);
                 }
@@ -692,6 +726,110 @@
 
             document.getElementById('split-modal').style.display = 'none';
             window.closeStaffModal();
+        };
+
+        window.openImportModal = () => {
+            document.getElementById('import-textarea').value = '';
+            document.getElementById('import-modal').style.display = 'flex';
+        };
+
+        window.processImport = async () => {
+            const text = document.getElementById('import-textarea').value.trim();
+            if (!text) return;
+
+            try {
+                // Parse Names
+                const firstLine = text.split('\n')[0].trim();
+                const namePart = firstLine.split(/ confirmed | have confirmed /i)[0].trim();
+                let names = namePart.split(/ and /i).map(n => n.trim().toUpperCase());
+                
+                // Parse Dates
+                const dateMatch = text.match(/Arrive on\s*([a-zA-Z]{3}\/\d{1,2}\/\d{4})\s*and leave on\s*([a-zA-Z]{3}\/\d{1,2}\/\d{4})/i);
+                if (!dateMatch) {
+                    window.showAlert("Could not find arrival and departure dates in the expected format.");
+                    return;
+                }
+                
+                const parseDate = (dStr) => {
+                    const months = {"Jan":"01","Feb":"02","Mar":"03","Apr":"04","May":"05","Jun":"06","Jul":"07","Aug":"08","Sep":"09","Oct":"10","Nov":"11","Dec":"12"};
+                    const [mon, day, year] = dStr.split('/');
+                    const monthNum = months[mon.charAt(0).toUpperCase() + mon.slice(1).toLowerCase()];
+                    return `${year}-${monthNum}-${day.padStart(2, '0')}`;
+                };
+                
+                const checkIn = parseDate(dateMatch[1]);
+                const checkOut = parseDate(dateMatch[2]);
+
+                // Parse Job (BAR IGNORED)
+                let job = 'none';
+                if (/\b(art|arts|paint|painting)\b/i.test(text)) job = 'art';
+                else if (/\b(social|socials|photo|photography|video)\b/i.test(text)) job = 'socials';
+
+                let firstId = null;
+
+                // Save Entries
+                for (let i = 0; i < names.length; i++) {
+                    const name = names[i];
+                    let notes = "";
+                    if (names.length === 2) {
+                        const otherName = i === 0 ? names[1] : names[0];
+                        notes = `WITH ${otherName}`;
+                    }
+                    
+                    const id = Math.random().toString(36).substr(2, 9);
+                    if (i === 0) firstId = id;
+                    
+                    const entry = {
+                        id,
+                        name: name,
+                        status: "future",
+                        room: "",
+                        bed: "",
+                        checkIn: checkIn,
+                        checkOut: checkOut,
+                        country: "",
+                        contact: "",
+                        job: job,
+                        notes: notes,
+                        ledger: {
+                            deposit: { paid: false, ref: false },
+                            agoda: { amt: "", ref: false },
+                            hostelworld: { amt: "", ref: false },
+                            booking: { amt: "", ref: false }
+                        }
+                    };
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'staff', id), entry);
+                }
+
+                document.getElementById('import-modal').style.display = 'none';
+                
+                // Wait for Firestore to sync locally, then open edit modal
+                const checkSyncAndEdit = (idToOpen) => {
+                    let attempts = 0;
+                    const checkSync = setInterval(() => {
+                        attempts++;
+                        if (staff.find(s => s.id === idToOpen)) {
+                            clearInterval(checkSync);
+                            window.editStaff(idToOpen);
+                        } else if (attempts > 30) {
+                            clearInterval(checkSync); // Timeout safety fallback
+                        }
+                    }, 100);
+                };
+
+                // Single person: open immediately. Two people: alert first, then open first person.
+                if (names.length > 1) {
+                    window.showAlert(`Successfully imported ${names.length} bookings. Opening the first one for review...`, false, () => {
+                        checkSyncAndEdit(firstId);
+                    });
+                } else {
+                    checkSyncAndEdit(firstId);
+                }
+
+            } catch (err) {
+                console.error(err);
+                window.showAlert("Error parsing text. Please ensure the format matches standard confirmation messages.");
+            }
         };
 
         document.getElementById('staff-form').onsubmit = async (e) => {
