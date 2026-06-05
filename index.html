@@ -621,7 +621,7 @@
                         const getAmt = p => Number(s.ledger[p]?.amt || 0);
                         const held = (s.ledger.deposit.paid ? DEPOSIT_VAL : 0) + getAmt('agoda') + getAmt('hostelworld') + getAmt('booking');
                         const ref = (s.ledger.deposit.ref ? DEPOSIT_VAL : 0) + (s.ledger.agoda.ref ? getAmt('agoda') : 0) + (s.ledger.hostelworld.ref ? getAmt('hostelworld') : 0) + (s.ledger.booking.ref ? getAmt('booking') : 0);
-                        const due = held - ref;
+                        const due = Number((held - ref).toFixed(2));
                         
                         const getBarIcon = (char, p, isDep = false) => {
                             const data = s.ledger[p], hasValue = isDep ? data.paid : getAmt(p) > 0;
@@ -687,6 +687,12 @@
             document.getElementById('modal-title').innerText = "Add Volunteer"; 
             document.getElementById('delete-btn').style.display = 'none'; 
             document.getElementById('split-btn').style.display = 'none';
+            
+            const rInput = document.getElementById('room-name'), bInput = document.getElementById('bed-number');
+            rInput.disabled = true; bInput.disabled = true;
+            rInput.classList.add('opacity-50', 'cursor-not-allowed'); bInput.classList.add('opacity-50', 'cursor-not-allowed');
+            rInput.placeholder = "LOCKED"; bInput.placeholder = "LOCKED";
+            
             modal.style.display = 'flex'; 
             window.calcRefund(); 
             window.syncLabels(); 
@@ -694,7 +700,7 @@
         
         window.closeStaffModal = () => { document.getElementById('staff-modal').style.display = 'none'; };
         
-        window.quickAdd = (room, bed, date) => { window.openStaffModal(); document.getElementById('room-name').value = room || ""; document.getElementById('bed-number').value = bed || ""; const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0'); document.getElementById('check-in').value = `${y}-${m}-${d}`; const out = new Date(date); out.setDate(date.getDate() + 14); const oy = out.getFullYear(), om = String(out.getMonth() + 1).padStart(2, '0'), od = String(out.getDate()).padStart(2, '0'); document.getElementById('check-out').value = `${oy}-${om}-${od}`; window.syncLabels(); };
+        window.quickAdd = (room, bed, date) => { window.openStaffModal(); document.getElementById('room-name').value = ""; document.getElementById('bed-number').value = ""; const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0'); document.getElementById('check-in').value = `${y}-${m}-${d}`; const out = new Date(date); out.setDate(date.getDate() + 14); const oy = out.getFullYear(), om = String(out.getMonth() + 1).padStart(2, '0'), od = String(out.getDate()).padStart(2, '0'); document.getElementById('check-out').value = `${oy}-${om}-${od}`; window.syncLabels(); };
 
         window.requestSplit = () => {
             const id = document.getElementById('staff-id').value;
@@ -810,7 +816,7 @@
                         attempts++;
                         if (staff.find(s => s.id === idToOpen)) {
                             clearInterval(checkSync);
-                            window.editStaff(idToOpen);
+                            window.editStaff(idToOpen, true);
                         } else if (attempts > 30) {
                             clearInterval(checkSync); // Timeout safety fallback
                         }
@@ -845,9 +851,22 @@
             window.closeStaffModal();
         };
 
-        window.editStaff = (id) => {
+        window.editStaff = (id, justImported = false) => {
             const s = staff.find(x => x.id === id); if (!s) return;
-            document.getElementById('modal-title').innerText = "Edit Volunteer"; document.getElementById('staff-id').value = s.id; document.getElementById('staff-name').value = s.name; document.getElementById('staff-status').value = s.status; document.getElementById('room-name').value = s.room || ""; document.getElementById('bed-number').value = s.bed || ""; document.getElementById('check-in').value = s.checkIn; document.getElementById('check-out').value = s.checkOut; document.getElementById('staff-country').value = s.country; document.getElementById('staff-contact').value = s.contact || ""; document.getElementById('staff-job').value = s.job || "none"; document.getElementById('staff-notes').value = s.notes || ""; window.syncLabels();
+            document.getElementById('modal-title').innerText = "Edit Volunteer"; document.getElementById('staff-id').value = s.id; document.getElementById('staff-name').value = s.name; document.getElementById('staff-status').value = s.status; 
+            
+            const rInput = document.getElementById('room-name'), bInput = document.getElementById('bed-number');
+            if (justImported) {
+                rInput.disabled = true; bInput.disabled = true;
+                rInput.classList.add('opacity-50', 'cursor-not-allowed'); bInput.classList.add('opacity-50', 'cursor-not-allowed');
+                rInput.placeholder = "LOCKED"; bInput.placeholder = "LOCKED";
+            } else {
+                rInput.disabled = false; bInput.disabled = false;
+                rInput.classList.remove('opacity-50', 'cursor-not-allowed'); bInput.classList.remove('opacity-50', 'cursor-not-allowed');
+                rInput.placeholder = "--"; bInput.placeholder = "--";
+            }
+            
+            document.getElementById('room-name').value = s.room || ""; document.getElementById('bed-number').value = s.bed || ""; document.getElementById('check-in').value = s.checkIn; document.getElementById('check-out').value = s.checkOut; document.getElementById('staff-country').value = s.country; document.getElementById('staff-contact').value = s.contact || ""; document.getElementById('staff-job').value = s.job || "none"; document.getElementById('staff-notes').value = s.notes || ""; window.syncLabels();
             const L = s.ledger; document.getElementById('paid-deposit').checked = L.deposit.paid; document.getElementById('ref-deposit').checked = L.deposit.ref; document.getElementById('amt-agoda').value = L.agoda.amt || ""; document.getElementById('ref-agoda').checked = L.agoda.ref; document.getElementById('amt-hostelworld').value = L.hostelworld.amt || ""; document.getElementById('ref-hostelworld').checked = L.hostelworld.ref; document.getElementById('amt-booking').value = L.booking.amt || ""; document.getElementById('ref-booking').checked = L.booking.ref;
             window.calcRefund(); 
             document.getElementById('delete-btn').style.display = 'block'; 
