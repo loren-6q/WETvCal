@@ -177,7 +177,6 @@
             </div>
         </div>
 
-        <!-- Main View Content -->
         <div id="calendar-view">
             <div class="bg-white rounded shadow-md border border-slate-300 overflow-hidden">
                 <div id="month-header" class="timeline-grid bg-slate-800 text-white text-[12px] font-bold uppercase tracking-widest py-1.5">
@@ -314,9 +313,10 @@
                             <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="paid-deposit" onchange="window.calcRefund()" class="w-4 h-4"> Paid</label>
                             <label class="flex items-center gap-1 cursor-pointer ml-auto"><input type="checkbox" id="ref-deposit" onchange="window.calcRefund()" class="w-4 h-4"> Refunded</label>
                         </div>
-                        <div class="flex items-center gap-3 bg-white p-1.5 rounded border border-slate-200 text-sm font-black uppercase"><div class="flex items-center gap-2 w-32" id="modal-icon-h"></div><input type="number" id="amt-hostelworld" step="0.01" oninput="window.calcRefund()" placeholder="0" class="w-20 p-0 border-b-2 font-bold outline-none"><label class="flex items-center gap-1 cursor-pointer ml-auto text-slate-400 font-bold"><input type="checkbox" id="ref-hostelworld" onchange="window.calcRefund()" class="w-4 h-4"> Refunded</label></div>
-                        <div class="flex items-center gap-3 bg-white p-1.5 rounded border border-slate-200 text-sm font-black uppercase"><div class="flex items-center gap-2 w-32" id="modal-icon-b"></div><input type="number" id="amt-booking" step="0.01" oninput="window.calcRefund()" placeholder="0" class="w-20 p-0 border-b-2 font-bold outline-none"><label class="flex items-center gap-1 cursor-pointer ml-auto text-slate-400 font-bold"><input type="checkbox" id="ref-booking" onchange="window.calcRefund()" class="w-4 h-4"> Refunded</label></div>
-                        <div class="flex items-center gap-3 bg-white p-1.5 rounded border border-slate-200 text-sm font-black uppercase"><div class="flex items-center gap-2 w-32" id="modal-icon-a"></div><input type="number" id="amt-agoda" step="0.01" oninput="window.calcRefund()" placeholder="0" class="w-20 p-0 border-b-2 font-bold outline-none"><label class="flex items-center gap-1 cursor-pointer ml-auto text-slate-400 font-bold"><input type="checkbox" id="ref-agoda" onchange="window.calcRefund()" class="w-4 h-4"> Refunded</label></div>
+                        <div class="flex items-center gap-3 bg-white p-1.5 rounded border border-slate-200 text-sm font-black uppercase"><div class="flex items-center gap-2 w-32" id="modal-icon-hw-wet"></div><input type="number" id="amt-hw-wet" step="0.01" oninput="window.calcRefund()" placeholder="0" class="w-20 p-0 border-b-2 font-bold outline-none"><label class="flex items-center gap-1 cursor-pointer ml-auto text-slate-400 font-bold"><input type="checkbox" id="ref-hw-wet" onchange="window.calcRefund()" class="w-4 h-4"> Refunded</label></div>
+                        <div class="flex items-center gap-3 bg-white p-1.5 rounded border border-slate-200 text-sm font-black uppercase"><div class="flex items-center gap-2 w-32" id="modal-icon-bdc-wet"></div><input type="number" id="amt-bdc-wet" step="0.01" oninput="window.calcRefund()" placeholder="0" class="w-20 p-0 border-b-2 font-bold outline-none"><label class="flex items-center gap-1 cursor-pointer ml-auto text-slate-400 font-bold"><input type="checkbox" id="ref-bdc-wet" onchange="window.calcRefund()" class="w-4 h-4"> Refunded</label></div>
+                        <div class="flex items-center gap-3 bg-white p-1.5 rounded border border-slate-200 text-sm font-black uppercase"><div class="flex items-center gap-2 w-32" id="modal-icon-hw-swims"></div><input type="number" id="amt-hw-swims" step="0.01" oninput="window.calcRefund()" placeholder="0" class="w-20 p-0 border-b-2 font-bold outline-none"><label class="flex items-center gap-1 cursor-pointer ml-auto text-slate-400 font-bold"><input type="checkbox" id="ref-hw-swims" onchange="window.calcRefund()" class="w-4 h-4"> Refunded</label></div>
+                        <div class="flex items-center gap-3 bg-white p-1.5 rounded border border-slate-200 text-sm font-black uppercase"><div class="flex items-center gap-2 w-32" id="modal-icon-bdc-swims"></div><input type="number" id="amt-bdc-swims" step="0.01" oninput="window.calcRefund()" placeholder="0" class="w-20 p-0 border-b-2 font-bold outline-none"><label class="flex items-center gap-1 cursor-pointer ml-auto text-slate-400 font-bold"><input type="checkbox" id="ref-bdc-swims" onchange="window.calcRefund()" class="w-4 h-4"> Refunded</label></div>
                     </div>
                 </div>
                 <textarea id="staff-notes" rows="3" class="w-full bg-slate-50 border border-slate-300 font-bold text-xs" style="min-height: 70px" placeholder="NOTES..."></textarea>
@@ -402,14 +402,17 @@
         let sortAsc = false;
         const mNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
         
-        // Full Moon Party Dates 2026
-        const fmpDates = ["2026-01-03", "2026-02-02", "2026-03-03", "2026-04-02", "2026-05-01", "2026-06-01", "2026-06-29", "2026-07-31", "2026-08-28", "2026-09-26", "2026-10-27", "2026-11-24", "2026-12-24", "2026-12-31"];
+        // Full Moon Party Dates 2026 & 2027
+        const fmpDates = [
+            "2026-01-03", "2026-02-02", "2026-03-03", "2026-04-02", "2026-05-01", "2026-06-01", "2026-06-29", "2026-07-31", "2026-08-28", "2026-09-26", "2026-10-27", "2026-11-24", "2026-12-24", "2026-12-31",
+            "2027-01-22", "2027-02-22", "2027-03-22", "2027-04-21", "2027-05-21", "2027-06-19", "2027-07-20", "2027-08-17", "2027-09-15", "2027-10-16", "2027-11-13", "2027-12-13", "2027-12-31"
+        ];
 
         const countries = ["Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Korea, North", "Korea, South", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"].sort();
 
         // Icon Helpers
         const makeIcon = (char, bg, col = "white") => `<div class="icon-box" style="background:${bg}"><span class="icon-font" style="color:${col}">${char}</span></div>`;
-        const ICONS = { D: makeIcon("$", "#eab308", "white"), H: makeIcon("H", "#f15a24"), B: makeIcon("B", "#003580"), A: makeIcon("A", "#888") };
+        const ICONS = { D: makeIcon("$", "#eab308", "white"), HW: makeIcon("H", "#f15a24"), BW: makeIcon("B", "#003580"), HS: makeIcon("H", "#0ea5e9"), BS: makeIcon("B", "#0284c7") };
         const to15MAR = d => !d || isNaN(d.getTime()) ? "---" : `${d.getDate()}${mNames[d.getMonth()]}${d.getFullYear().toString().substr(-2)}`;
 
         // Strict Flat Date Math: Computes integer days between two dates, ignoring timezone drift
@@ -444,13 +447,14 @@
             const cSel = document.getElementById('staff-country');
             countries.forEach(c => { const opt = document.createElement('option'); opt.value = c; opt.innerText = c; cSel.appendChild(opt); });
             
-            document.getElementById('footer-booking-icons').innerHTML = `<div class="legend-item">${ICONS.D} DEPOSIT</div><div class="legend-item">${ICONS.H} HW</div><div class="legend-item">${ICONS.B} BDC</div><div class="legend-item">${ICONS.A} AGODA</div>`;
+            document.getElementById('footer-booking-icons').innerHTML = `<div class="legend-item">${ICONS.HW} HW WET</div><div class="legend-item">${ICONS.BW} BDC WET</div><div class="legend-item">${ICONS.HS} HW SWIMS</div><div class="legend-item">${ICONS.BS} BDC SWIMS</div>`;
             document.getElementById('footer-job-icons').innerHTML = `<div class="legend-item"><i data-lucide="palette" size="16"></i> ART</div><div class="legend-item"><i data-lucide="megaphone" size="16"></i> SOCIALS</div><div class="legend-item"><i data-lucide="beer" size="16"></i> BAR</div>`;
             
             document.getElementById('modal-icon-d').innerHTML = `${ICONS.D} DEPOSIT`;
-            document.getElementById('modal-icon-h').innerHTML = `${ICONS.H} HOSTELWORLD`;
-            document.getElementById('modal-icon-b').innerHTML = `${ICONS.B} BDC`;
-            document.getElementById('modal-icon-a').innerHTML = `${ICONS.A} AGODA`;
+            document.getElementById('modal-icon-hw-wet').innerHTML = `${ICONS.HW} HW WET`;
+            document.getElementById('modal-icon-bdc-wet').innerHTML = `${ICONS.BW} BDC WET`;
+            document.getElementById('modal-icon-hw-swims').innerHTML = `${ICONS.HS} HW SWIMS`;
+            document.getElementById('modal-icon-bdc-swims').innerHTML = `${ICONS.BS} BDC SWIMS`;
             window.addEventListener('resize', window.render);
         };
 
@@ -505,8 +509,6 @@
             });
 
             const activeStaff = staff.filter(s => s.status !== 'cancelled' && s.status !== 'noshow');
-            const viewStartUTC = Date.UTC(viewStart.getFullYear(), viewStart.getMonth(), viewStart.getDate());
-            const viewEndUTC = viewStartUTC + daysToShow * 86400000;
             
             const bedGroups = {};
             
@@ -527,11 +529,7 @@
                 if (key === 'NONE') {
                     // Only process NONE staff who OVERLAP the current view!
                     const overlappingNone = bedGroups[key].filter(s => {
-                        const [inY, inM, inD] = s.checkIn.split('-');
-                        const [outY, outM, outD] = s.checkOut.split('-');
-                        const startUTC = Date.UTC(inY, inM - 1, inD);
-                        const endUTC = Date.UTC(outY, outM - 1, outD);
-                        return (startUTC <= viewEndUTC && endUTC >= viewStartUTC);
+                        return (getDayIndex(s.checkIn) < daysToShow && getDayIndex(s.checkOut) > 0);
                     });
 
                     const rows = [];
@@ -548,11 +546,7 @@
                     const parts = key.split('-');
                     const isPermanent = parts[0] === '211' && parseInt(parts[1]) >= 1 && parseInt(parts[1]) <= 14;
                     const overlappingStaff = bedGroups[key].filter(s => {
-                        const [inY, inM, inD] = s.checkIn.split('-');
-                        const [outY, outM, outD] = s.checkOut.split('-');
-                        const startUTC = Date.UTC(inY, inM - 1, inD);
-                        const endUTC = Date.UTC(outY, outM - 1, outD);
-                        return (startUTC <= viewEndUTC && endUTC >= viewStartUTC);
+                        return (getDayIndex(s.checkIn) < daysToShow && getDayIndex(s.checkOut) > 0);
                     });
                     
                     if (isPermanent || overlappingStaff.length > 0) {
@@ -562,7 +556,6 @@
             });
 
             // Fill with blank rows if short
-            let currentLength = timelineBeds.length;
             while (timelineBeds.length < 15) { timelineBeds.push({ label: '—', staff: [], isTemp: true, isUnassigned: false }); }
 
             // Sorting: Rooms first, Temp Fillers next, NONE rows at the bottom
@@ -618,22 +611,33 @@
                         
                         if (searchTerm && !s.name.includes(searchTerm)) bar.style.opacity = "0.15";
                         
-                        const getAmt = p => Number(s.ledger[p]?.amt || 0);
-                        const held = (s.ledger.deposit.paid ? DEPOSIT_VAL : 0) + getAmt('agoda') + getAmt('hostelworld') + getAmt('booking');
-                        const ref = (s.ledger.deposit.ref ? DEPOSIT_VAL : 0) + (s.ledger.agoda.ref ? getAmt('agoda') : 0) + (s.ledger.hostelworld.ref ? getAmt('hostelworld') : 0) + (s.ledger.booking.ref ? getAmt('booking') : 0);
+                        // Map old legacy entries gracefully
+                        const hwWetAmt = Number(s.ledger.hw_wet?.amt || s.ledger.hostelworld?.amt || 0);
+                        const bdcWetAmt = Number(s.ledger.bdc_wet?.amt || s.ledger.booking?.amt || 0);
+                        const hwSwimsAmt = Number(s.ledger.hw_swims?.amt || 0);
+                        const bdcSwimsAmt = Number(s.ledger.bdc_swims?.amt || 0);
+                        const oldAgodaAmt = Number(s.ledger.agoda?.amt || 0);
+
+                        const hwWetRef = s.ledger.hw_wet?.ref || s.ledger.hostelworld?.ref || false;
+                        const bdcWetRef = s.ledger.bdc_wet?.ref || s.ledger.booking?.ref || false;
+                        const hwSwimsRef = s.ledger.hw_swims?.ref || false;
+                        const bdcSwimsRef = s.ledger.bdc_swims?.ref || false;
+                        const oldAgodaRef = s.ledger.agoda?.ref || false;
+
+                        const held = (s.ledger.deposit?.paid ? DEPOSIT_VAL : 0) + hwWetAmt + bdcWetAmt + hwSwimsAmt + bdcSwimsAmt + oldAgodaAmt;
+                        const ref = (s.ledger.deposit?.ref ? DEPOSIT_VAL : 0) + (hwWetRef ? hwWetAmt : 0) + (bdcWetRef ? bdcWetAmt : 0) + (hwSwimsRef ? hwSwimsAmt : 0) + (bdcSwimsRef ? bdcSwimsAmt : 0) + (oldAgodaRef ? oldAgodaAmt : 0);
                         const due = Number((held - ref).toFixed(2));
                         
-                        const getBarIcon = (char, p, isDep = false) => {
-                            const data = s.ledger[p], hasValue = isDep ? data.paid : getAmt(p) > 0;
-                            const cls = !hasValue ? 'icon-none' : (data.ref ? 'icon-ref' : 'icon-paid');
-                            const bg = isDep ? "#eab308" : (p === 'hostelworld' ? "#f15a24" : (p === 'booking' ? "#003580" : "#555"));
+                        const getBarIcon = (char, amt, isRef, isDep = false, bg) => {
+                            const hasValue = isDep ? amt : amt > 0;
+                            const cls = !hasValue ? 'icon-none' : (isRef ? 'icon-ref' : 'icon-paid');
                             return `<div class="icon-box ${cls}" style="${hasValue ? 'background:'+bg : ''}"><span class="icon-font" style="color:white">${char}</span></div>`;
                         };
 
                         const jobIcons = { art: 'palette', socials: 'megaphone', bar: 'beer' };
                         const jobIconHtml = s.job && s.job !== 'none' ? `<i data-lucide="${jobIcons[s.job]}" size="14" class="mr-1 text-white/80"></i>` : '';
 
-                        bar.innerHTML = `<div class="bar-sticky-content">${jobIconHtml}<span class="mx-1.5 truncate">${s.name}</span><div class="flex gap-1 items-center scale-90 shrink-0">${getBarIcon("$", 'deposit', true)}${getBarIcon("H", 'hostelworld')}${getBarIcon("B", 'booking')}${getBarIcon("A", 'agoda')}${due > 0 ? `<span class="bg-black/40 px-1.5 py-0.5 rounded text-[16px] font-black ml-1">฿${due}</span>` : ''}</div></div>`;
+                        bar.innerHTML = `<div class="bar-sticky-content">${jobIconHtml}<span class="mx-1.5 truncate">${s.name}</span><div class="flex gap-1 items-center scale-90 shrink-0">${getBarIcon("$", s.ledger.deposit?.paid, s.ledger.deposit?.ref, true, "#eab308")}${getBarIcon("H", hwWetAmt, hwWetRef, false, "#f15a24")}${getBarIcon("B", bdcWetAmt, bdcWetRef, false, "#003580")}${getBarIcon("H", hwSwimsAmt, hwSwimsRef, false, "#0ea5e9")}${getBarIcon("B", bdcSwimsAmt, bdcSwimsRef, false, "#0284c7")}${oldAgodaAmt > 0 ? getBarIcon("A", oldAgodaAmt, oldAgodaRef, false, "#888") : ''}${due > 0 ? `<span class="bg-black/40 px-1.5 py-0.5 rounded text-[16px] font-black ml-1">฿${due}</span>` : ''}</div></div>`;
                         bar.onclick = (e) => { e.stopPropagation(); window.editStaff(s.id); }; row.appendChild(bar);
                     }
                 });
@@ -674,7 +678,30 @@
         window.clearSearch = () => { document.getElementById('staff-search').value = ""; window.handleSearch(""); };
         window.jumpToSearchMatch = () => { const matches = staff.filter(s => s.name.includes(searchTerm)).sort((a,b) => a.checkIn.localeCompare(b.checkIn)); if (matches.length > 0) { const match = matches[searchMatchIndex % matches.length]; const d = new Date(match.checkIn + "T12:00:00"); d.setDate(d.getDate() - 3); viewStart = d; searchMatchIndex++; document.getElementById('match-counter').innerText = `Match ${(searchMatchIndex % matches.length) + 1} of ${matches.length}`; window.render(); } };
         window.syncLabels = () => { const iIn = document.getElementById('check-in').value, iOut = document.getElementById('check-out').value; document.getElementById('ov-in').innerText = iIn ? to15MAR(new Date(iIn + "T12:00:00")) : "---"; document.getElementById('ov-out').innerText = iOut ? to15MAR(new Date(iOut + "T12:00:00")) : "---"; };
-        window.calcRefund = () => { const isChecked = id => document.getElementById(id).checked, getVal = id => Number(document.getElementById(id).value) || 0; let h = isChecked('paid-deposit') ? DEPOSIT_VAL : 0; h += getVal('amt-agoda') + getVal('amt-hostelworld') + getVal('amt-booking'); let r = isChecked('ref-deposit') ? DEPOSIT_VAL : 0; if (isChecked('ref-agoda')) r += getVal('amt-agoda'); if (isChecked('ref-hostelworld')) r += getVal('amt-hostelworld'); if (isChecked('ref-booking')) r += getVal('amt-booking'); document.getElementById('display-held').innerText = `฿${h.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2})}`; document.getElementById('display-refund-due').innerText = `฿${(h - r).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2})}`; };
+        
+        window.calcRefund = () => { 
+            const isChecked = id => document.getElementById(id).checked, getVal = id => Number(document.getElementById(id).value) || 0; 
+            
+            // Re-grab the specific legacy agoda amount for this record if we are editing
+            const currentId = document.getElementById('staff-id').value;
+            const existingRecord = staff.find(x => x.id === currentId);
+            const legacyAgodaAmt = Number(existingRecord?.ledger?.agoda?.amt || 0);
+            const legacyAgodaRef = existingRecord?.ledger?.agoda?.ref || false;
+
+            let h = isChecked('paid-deposit') ? DEPOSIT_VAL : 0; 
+            h += getVal('amt-hw-wet') + getVal('amt-bdc-wet') + getVal('amt-hw-swims') + getVal('amt-bdc-swims') + legacyAgodaAmt; 
+            
+            let r = isChecked('ref-deposit') ? DEPOSIT_VAL : 0; 
+            if (isChecked('ref-hw-wet')) r += getVal('amt-hw-wet'); 
+            if (isChecked('ref-bdc-wet')) r += getVal('amt-bdc-wet'); 
+            if (isChecked('ref-hw-swims')) r += getVal('amt-hw-swims'); 
+            if (isChecked('ref-bdc-swims')) r += getVal('amt-bdc-swims'); 
+            if (legacyAgodaRef) r += legacyAgodaAmt;
+            
+            document.getElementById('display-held').innerText = `฿${h.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2})}`; 
+            document.getElementById('display-refund-due').innerText = `฿${(h - r).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2})}`; 
+        };
+
         window.prevPeriod = () => { viewStart.setDate(viewStart.getDate() - 7); window.render(); };
         window.nextPeriod = () => { viewStart.setDate(viewStart.getDate() + 7); window.render(); };
         window.goToday = () => { viewStart = new Date(); viewStart.setHours(12,0,0,0); window.render(); };
@@ -799,9 +826,10 @@
                         notes: notes,
                         ledger: {
                             deposit: { paid: false, ref: false },
-                            agoda: { amt: "", ref: false },
-                            hostelworld: { amt: "", ref: false },
-                            booking: { amt: "", ref: false }
+                            hw_wet: { amt: "", ref: false },
+                            bdc_wet: { amt: "", ref: false },
+                            hw_swims: { amt: "", ref: false },
+                            bdc_swims: { amt: "", ref: false }
                         }
                     };
                     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'staff', id), entry);
@@ -842,7 +870,12 @@
             e.preventDefault(); const cin = document.getElementById('check-in').value, cout = document.getElementById('check-out').value;
             if (cin >= cout) { window.showAlert("INVALID DATES:\nDeparture must be after arrival."); return; }
             const id = document.getElementById('staff-id').value || Math.random().toString(36).substr(2, 9);
-            const entry = { id, name: document.getElementById('staff-name').value.trim().toUpperCase(), status: document.getElementById('staff-status').value, room: document.getElementById('room-name').value.trim().toUpperCase(), bed: document.getElementById('bed-number').value, checkIn: cin, checkOut: cout, country: document.getElementById('staff-country').value, contact: document.getElementById('staff-contact').value, job: document.getElementById('staff-job').value, notes: document.getElementById('staff-notes').value, ledger: { deposit: { paid: document.getElementById('paid-deposit').checked, ref: document.getElementById('ref-deposit').checked }, agoda: { amt: document.getElementById('amt-agoda').value, ref: document.getElementById('ref-agoda').checked }, hostelworld: { amt: document.getElementById('amt-hostelworld').value, ref: document.getElementById('ref-hostelworld').checked }, booking: { amt: document.getElementById('amt-booking').value, ref: document.getElementById('ref-booking').checked } } };
+            
+            // Preserve Agoda data if it existed previously
+            const existingRecord = staff.find(x => x.id === id);
+            const preservedAgoda = existingRecord?.ledger?.agoda || { amt: "", ref: false };
+
+            const entry = { id, name: document.getElementById('staff-name').value.trim().toUpperCase(), status: document.getElementById('staff-status').value, room: document.getElementById('room-name').value.trim().toUpperCase(), bed: document.getElementById('bed-number').value, checkIn: cin, checkOut: cout, country: document.getElementById('staff-country').value, contact: document.getElementById('staff-contact').value, job: document.getElementById('staff-job').value, notes: document.getElementById('staff-notes').value, ledger: { deposit: { paid: document.getElementById('paid-deposit').checked, ref: document.getElementById('ref-deposit').checked }, hw_wet: { amt: document.getElementById('amt-hw-wet').value, ref: document.getElementById('ref-hw-wet').checked }, bdc_wet: { amt: document.getElementById('amt-bdc-wet').value, ref: document.getElementById('ref-bdc-wet').checked }, hw_swims: { amt: document.getElementById('amt-hw-swims').value, ref: document.getElementById('ref-hw-swims').checked }, bdc_swims: { amt: document.getElementById('amt-bdc-swims').value, ref: document.getElementById('ref-bdc-swims').checked }, agoda: preservedAgoda } };
             
             const conflict = staff.find(s => s.id !== id && entry.room !== "" && entry.bed !== "" && String(s.room) === String(entry.room) && String(s.bed) === String(entry.bed) && entry.checkIn < s.checkOut && s.checkIn < entry.checkOut);
             if (conflict) { window.showAlert(`BED OCCUPIED ERROR:\n\n${conflict.name} is using Bed ${entry.room}-${entry.bed} until ${to15MAR(new Date(conflict.checkOut + "T12:00:00"))}.`); return; }
@@ -867,7 +900,18 @@
             }
             
             document.getElementById('room-name').value = s.room || ""; document.getElementById('bed-number').value = s.bed || ""; document.getElementById('check-in').value = s.checkIn; document.getElementById('check-out').value = s.checkOut; document.getElementById('staff-country').value = s.country; document.getElementById('staff-contact').value = s.contact || ""; document.getElementById('staff-job').value = s.job || "none"; document.getElementById('staff-notes').value = s.notes || ""; window.syncLabels();
-            const L = s.ledger; document.getElementById('paid-deposit').checked = L.deposit.paid; document.getElementById('ref-deposit').checked = L.deposit.ref; document.getElementById('amt-agoda').value = L.agoda.amt || ""; document.getElementById('ref-agoda').checked = L.agoda.ref; document.getElementById('amt-hostelworld').value = L.hostelworld.amt || ""; document.getElementById('ref-hostelworld').checked = L.hostelworld.ref; document.getElementById('amt-booking').value = L.booking.amt || ""; document.getElementById('ref-booking').checked = L.booking.ref;
+            const L = s.ledger; 
+            document.getElementById('paid-deposit').checked = L.deposit?.paid || false; 
+            document.getElementById('ref-deposit').checked = L.deposit?.ref || false; 
+            document.getElementById('amt-hw-wet').value = L.hw_wet?.amt || L.hostelworld?.amt || ""; 
+            document.getElementById('ref-hw-wet').checked = L.hw_wet?.ref || L.hostelworld?.ref || false; 
+            document.getElementById('amt-bdc-wet').value = L.bdc_wet?.amt || L.booking?.amt || ""; 
+            document.getElementById('ref-bdc-wet').checked = L.bdc_wet?.ref || L.booking?.ref || false; 
+            document.getElementById('amt-hw-swims').value = L.hw_swims?.amt || ""; 
+            document.getElementById('ref-hw-swims').checked = L.hw_swims?.ref || false; 
+            document.getElementById('amt-bdc-swims').value = L.bdc_swims?.amt || ""; 
+            document.getElementById('ref-bdc-swims').checked = L.bdc_swims?.ref || false;
+            
             window.calcRefund(); 
             document.getElementById('delete-btn').style.display = 'block'; 
             document.getElementById('split-btn').style.display = 'block';
