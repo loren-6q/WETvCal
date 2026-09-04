@@ -466,21 +466,58 @@
 
         window.processImport = async () => {
             const txt = $('import-textarea').value.trim(); if (!txt) return;
+            
+            // Immediately show loading state
+            const btn = document.querySelector('#import-modal button.bg-indigo-600');
+            const ogText = btn.innerText;
+            btn.innerText = 'SAVING...';
+            btn.disabled = true;
+
             try {
-                const names = txt.split('\n')[0].split(/ confirmed | have confirmed /i)[0].split(/ and /i).map(n => n.trim().toUpperCase());
+                // Ignore blank lines and proactively hunt for the line with the names
+                const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                const confirmLine = lines.find(l => / confirmed | have confirmed /i.test(l)) || lines[0];
+                const names = confirmLine.split(/ confirmed | have confirmed /i)[0].split(/ and /i).map(n => n.trim().toUpperCase());
+                
                 const dates = txt.match(/Arrive on\s*([a-zA-Z]{3}\/\d{1,2}\/\d{4})\s*and leave on\s*([a-zA-Z]{3}\/\d{1,2}\/\d{4})/i);
-                if (!dates) return window.showAlert("Could not find arrival and departure dates in the expected format.");
+                if (!dates) {
+                    btn.innerText = ogText; btn.disabled = false;
+                    return window.showAlert("Could not find arrival and departure dates in the expected format.");
+                }
+                
                 const pDate = (d) => { const [m, dy, y] = d.split('/'); return `${y}-${{"Jan":"01","Feb":"02","Mar":"03","Apr":"04","May":"05","Jun":"06","Jul":"07","Aug":"08","Sep":"09","Oct":"10","Nov":"11","Dec":"12"}[m.charAt(0).toUpperCase()+m.slice(1).toLowerCase()]}-${dy.padStart(2,'0')}`; };
                 let job = 'none'; if (/\b(art|arts|paint|painting)\b/i.test(txt)) job = 'art'; else if (/\b(social|socials|photo|photography|video)\b/i.test(txt)) job = 'socials';
                 
                 let firstId = null;
                 for (let i = 0; i < names.length; i++) {
                     const id = Math.random().toString(36).substr(2, 9); if (i === 0) firstId = id;
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'staff', id), { id, name: names[i], status: "future", room: "", bed: "", checkIn: pDate(dates[1]), checkOut: pDate(dates[2]), country: "", contact: "", job, notes: names.length === 2 ? `WITH ${i===0 ? names[1] : names[0]}` : "", ledger: { deposit: { paid: false, ref: false }, hw_wet: { amt: "", ref: false }, bdc_wet: { amt: "", ref: false }, hw_swims: { amt: "", ref: false }, bdc_swims: { amt: "", ref: false } } });
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'staff', id), { id, name: names[i], status: "future", room: "", bed: "", checkIn: pDate(dates[1]), checkOut: pDate(dates[2]), country: "", contact: "", job, notes: names.length === 2 ? `WITH ${i===0 ? names[1] : names[0]}` : "", ledger: { deposit: { paid: false, ref: false }, hw_wet: { amt: "", ref: false }, bdc_wet: { amt: "", ref: false }, hw_swims: { amt: "", ref: false }, bdc_swims: { amt: "", ref: false }, agoda: { amt: "", ref: false } } });
                 }
+                
                 $('import-modal').style.display = 'none';
-                const checkSync = setInterval(() => { if (staff.find(s => s.id === firstId)) { clearInterval(checkSync); window.editStaff(firstId, true); } }, 100);
-            } catch (e) { console.error(e); window.showAlert("Error parsing text."); }
+                btn.innerText = ogText; btn.disabled = false;
+                
+                let attempts = 0;
+                const checkSync = setInterval(() => {
+                    attempts++;
+                    if (staff.find(s => s.id === firstId)) {
+                        clearInterval(checkSync);
+                        if (names.length > 1) {
+                            window.showAlert(`Successfully imported ${names.length} bookings. Opening the first one for review...`, false, () => window.editStaff(firstId, true));
+                        } else {
+                            window.editStaff(firstId, true);
+                        }
+                    } else if (attempts > 50) {
+                        clearInterval(checkSync); // Safety timeout after 5 seconds
+                        window.showAlert("Saved to database, but auto-open timed out. Please click the record manually to edit.");
+                    }
+                }, 100);
+
+            } catch (e) { 
+                console.error(e); 
+                btn.innerText = ogText; btn.disabled = false;
+                window.showAlert("Error: " + e.message); 
+            }
         };
 
         window.requestDelete = () => window.showAlert(`Are you sure you want to permanently delete the record for ${$('staff-name').value}?`, true, async () => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'staff', $('staff-id').value)); window.closeStaffModal(); });
@@ -489,5 +526,6 @@
 
         init();
     </script>
+    <script src="https://loren-6q.github.io/WETNav/nav.js"></script>
 </body>
 </html>
